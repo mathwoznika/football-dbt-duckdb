@@ -1,0 +1,108 @@
+version: 2
+
+models:
+
+  - name: bronze_fixtures
+    description: >
+      Jogos do Coritiba, extraidos por time. Serve de semente: e dele que sai a
+      lista de ligas da onda 2 e o escopo do detalhe por jogo da onda 3.
+      Como dado, e subconjunto exato do bronze_fixtures_liga.
+    columns:
+      - name: fixture_id
+        description: Identificador da partida na API-Football.
+        tests: [unique, not_null]
+      - name: season
+        tests: [not_null]
+      - name: league_id
+        tests: [not_null]
+
+  - name: bronze_fixtures_liga
+    description: >
+      Calendario completo de todas as competicoes que o Coritiba disputou, com
+      todos os times. E a fonte do silver, porque traz o contexto dos
+      adversarios entre si.
+    columns:
+      - name: fixture_id
+        tests: [unique, not_null]
+      - name: season
+        tests: [not_null]
+      - name: league_id
+        tests: [not_null]
+      - name: status
+        tests: [not_null]
+
+  - name: bronze_teams
+    description: Times por competicao e temporada, com o estadio de cada um.
+    columns:
+      - name: team_id
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+
+  - name: bronze_leagues
+    description: >
+      Catalogo de competicoes por temporada, com as flags de cobertura que
+      dizem quais endpoints tem dado em cada ano.
+    columns:
+      - name: league_id
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: tipo
+        description: League para pontos corridos, Cup para mata-mata.
+        tests:
+          - accepted_values:
+              values: ['League', 'Cup']
+
+  - name: bronze_standings
+    description: Classificacao oficial entregue pela API, usada para validar a nossa.
+    columns:
+      - name: team_id
+        tests: [not_null]
+      - name: pontos
+        tests: [not_null]
+
+  - name: bronze_fixture_statistics
+    description: >
+      Estatistica coletiva por time em cada jogo, ja pivotada de chave-valor
+      para colunas. Depende da onda 3, ainda em andamento.
+    columns:
+      - name: fixture_id
+        tests: [not_null]
+      - name: team_id
+        tests: [not_null]
+
+  - name: bronze_fixture_events
+    description: Gols, cartoes, substituicoes e VAR. Uma linha por evento.
+    columns:
+      - name: fixture_id
+        tests: [not_null]
+      - name: team_id
+        tests: [not_null]
+
+  - name: bronze_fixture_lineups
+    description: >
+      Escalacoes, titulares e reservas empilhados com a flag titular.
+      Tambem e a fonte confiavel de qual tecnico dirigiu cada jogo.
+    columns:
+      - name: fixture_id
+        tests: [not_null]
+      - name: player_id
+        tests: [not_null]
+
+  - name: bronze_fixture_players
+    description: Estatistica individual por jogador em cada jogo, com a nota da atuacao.
+    columns:
+      - name: fixture_id
+        tests: [not_null]
+      - name: player_id
+        tests: [not_null]
+
+  - name: bronze_coachs
+    description: >
+      Carreira dos tecnicos que passaram pelo clube. ATENCAO: as datas sao
+      pouco confiaveis (sempre dia 01, "fim" nulo em passagens encerradas).
+      Para desempenho por tecnico use o bronze_fixture_lineups.
+
+  - name: bronze_transfers
+    description: Transferencias de jogadores. Uma linha por movimentacao.

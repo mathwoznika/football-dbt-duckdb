@@ -17,6 +17,11 @@ with escalacoes as (
         coach_id,
         tecnico
     from {{ ref('bronze_fixture_lineups') }}
+    -- Ha escalacoes em que a API nao registrou o tecnico (1 em 124 hoje).
+    -- Um jogo sem tecnico identificado nao pode ser atribuido a ninguem,
+    -- entao fica de fora deste mart. Consequencia a ter em mente: a soma de
+    -- jogos por tecnico pode ficar abaixo do total de jogos do time.
+    where coach_id is not null
 
 ),
 

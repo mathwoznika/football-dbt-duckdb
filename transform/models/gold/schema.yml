@@ -1,0 +1,98 @@
+version: 2
+
+models:
+
+  - name: gold_classificacao
+    description: >
+      Classificacao calculada a partir dos resultados, so para competicoes de
+      pontos corridos e apenas na fase regular. Os pontos batem 100% com o
+      standings oficial da API — ver o teste singular que garante isso.
+    columns:
+      - name: time_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('silver_time')
+              field: team_id
+      - name: posicao
+        tests: [not_null]
+      - name: pontos
+        tests: [not_null]
+
+  - name: gold_time_temporada
+    description: >
+      Cabecalho da pagina de um time: uma linha por competicao disputada na
+      temporada, copa inclusive. A coluna posicao so vem preenchida onde faz
+      sentido (pontos corridos).
+    columns:
+      - name: time_id
+        tests: [not_null]
+      - name: jogos
+        tests: [not_null]
+
+  - name: gold_evolucao_classificacao
+    description: >
+      Pontos e posicao de cada time apos cada rodada. Alimenta o grafico de
+      linha da temporada.
+    columns:
+      - name: time_id
+        tests: [not_null]
+      - name: rodada_n
+        tests: [not_null]
+      - name: posicao
+        tests: [not_null]
+
+  - name: gold_confronto_direto
+    description: >
+      Retrospecto entre dois times. Cada confronto aparece nos dois sentidos,
+      para a API consultar sempre pelo lado de quem esta na tela.
+    columns:
+      - name: time_id
+        tests: [not_null]
+      - name: adversario_id
+        tests: [not_null]
+
+  - name: gold_jogador_temporada
+    description: >
+      Pagina de elenco. Depende da onda 3 — use jogos_com_dado para saber
+      quanto da amostra ja existe antes de tirar conclusao.
+    columns:
+      - name: player_id
+        tests: [not_null]
+      - name: team_id
+        tests: [not_null]
+
+  - name: gold_tecnico_desempenho
+    description: >
+      Aproveitamento por tecnico, derivado da escalacao de cada jogo e nao do
+      cadastro de carreira (que tem datas pouco confiaveis).
+    columns:
+      - name: coach_id
+        tests: [not_null]
+      - name: jogos
+        tests: [not_null]
+
+  - name: gold_coritiba_campanha
+    description: >
+      Campanha do clube jogo a jogo, com acumulados e forma. O time e uma
+      variavel: dbt run --vars '{time_id: 128}' gera a de outro clube.
+    columns:
+      - name: fixture_id
+        tests: [not_null]
+
+  - name: gold_features_partida
+    description: >
+      Tabela de features para modelo de previsao. Toda coluna de feature contem
+      apenas informacao disponivel ANTES do jogo; as janelas terminam em
+      "1 preceding" para evitar data leakage. As colunas alvo_* sao o que se
+      quer prever e nunca entram como entrada do modelo.
+    columns:
+      - name: fixture_id
+        tests: [not_null]
+      - name: time_id
+        tests: [not_null]
+      - name: alvo_resultado
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['V', 'E', 'D']

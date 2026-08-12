@@ -1,0 +1,53 @@
+version: 2
+
+models:
+
+  - name: silver_partida_time
+    description: >
+      Fato de partida na perspectiva de cada time: duas linhas por jogo, uma
+      por clube, com as colunas no padrao "a favor / contra". Universal — todos
+      os times, sem filtro de clube. O recorte do Coritiba pertence ao gold.
+    columns:
+      - name: fixture_id
+        tests: [not_null]
+      - name: time_id
+        tests: [not_null]
+      - name: adversario_id
+        tests: [not_null]
+      - name: mando
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['casa', 'fora']
+      - name: resultado
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['V', 'E', 'D']
+      - name: pontos
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1, 3]
+              quote: false
+
+  - name: silver_time
+    description: >
+      Dimensao de clubes, uma linha por time com o registro mais recente
+      (nome, estadio e capacidade mudam ao longo dos anos).
+    columns:
+      - name: team_id
+        tests: [unique, not_null]
+      - name: team_nome
+        tests: [not_null]
+
+  - name: silver_partida_estatistica
+    description: >
+      Resultado somado a estatistica coletiva, no padrao pro/contra. As colunas
+      de estatistica vem nulas enquanto a onda 3 nao cobrir aquele jogo — use
+      tem_estatistica para filtrar.
+    columns:
+      - name: fixture_id
+        tests: [not_null]
+      - name: time_id
+        tests: [not_null]
