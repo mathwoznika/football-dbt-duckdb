@@ -1,6 +1,8 @@
 import { Link, Route, Routes } from "react-router-dom";
 
 import Times from "./pages/Times";
+import JogadorPage from "./pages/Jogador";
+import JogoPage from "./pages/Jogo";
 import TimePage from "./pages/Time";
 
 /**
@@ -27,6 +29,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Times />} />
           <Route path="/times/:id" element={<TimePage />} />
+          <Route path="/jogos/:fixtureId" element={<JogoPage />} />
+          <Route path="/jogadores/:playerId" element={<JogadorPage />} />
           <Route path="*" element={<p>Página não encontrada.</p>} />
         </Routes>
       </main>

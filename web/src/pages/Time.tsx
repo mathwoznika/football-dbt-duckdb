@@ -50,6 +50,10 @@ export default function TimePage() {
     () => (pronto ? api.chaveamento(leagueId!, season!) : Promise.resolve([])),
     [season, leagueId],
   );
+  const { dados: elenco } = useDados(
+    () => (pronto ? api.elenco(teamId, season, leagueId) : Promise.resolve([])),
+    [teamId, season, leagueId],
+  );
 
   const resumo = temporadas?.find(
     (t) => t.season === season && t.league_id === leagueId,
@@ -90,6 +94,7 @@ export default function TimePage() {
               <th></th>
               <th className="num">Pts</th>
               <th className="num">Forma*</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -118,6 +123,11 @@ export default function TimePage() {
                 </td>
                 <td className="num">{j.pontos_acumulados}</td>
                 <td className="num discreto">{j.pontos_5_anteriores ?? "—"}</td>
+                <td>
+                  <Link className="botao" to={`/jogos/${j.fixture_id}`}>
+                    Estatísticas
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -264,6 +274,77 @@ export default function TimePage() {
         tabelaCampanha
       )}
 
+      {/* -------------------------------------------------- elenco */}
+      <div className="cartao">
+        <h2>Elenco na competição</h2>
+        {elenco && elenco.length > 0 ? (
+          <>
+            <div className="tabela-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Jogador</th>
+                    <th>Pos</th>
+                    <th className="num">J</th>
+                    <th className="num">Tit.</th>
+                    <th className="num">Min</th>
+                    <th className="num">Nota</th>
+                    <th className="num">G</th>
+                    <th className="num">A</th>
+                    <th className="num">Fin.</th>
+                    <th className="num">Des.</th>
+                    <th className="num">Duelos</th>
+                    <th className="num">Cartões</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {elenco.map((j) => (
+                    <tr key={j.player_id}>
+                      <td>
+                        <Link to={`/jogadores/${j.player_id}`}>
+                          <strong>{j.jogador_nome}</strong>
+                        </Link>
+                      </td>
+                      <td className="discreto">{j.posicao ?? "—"}</td>
+                      <td className="num">{j.jogos_com_dado}</td>
+                      <td className="num discreto">{j.jogos_titular}</td>
+                      <td className="num discreto">{j.minutos ?? "—"}</td>
+                      <td className="num">
+                        {j.nota_media !== null ? (
+                          <span className={`nota ${classeDaNota(j.nota_media)}`}>
+                            {j.nota_media.toFixed(2)}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="num">{j.gols ?? "—"}</td>
+                      <td className="num">{j.assistencias ?? "—"}</td>
+                      <td className="num discreto">{j.chutes ?? "—"}</td>
+                      <td className="num discreto">{j.desarmes ?? "—"}</td>
+                      <td className="num discreto">
+                        {j.duelos_ganhos ?? 0}/{j.duelos ?? 0}
+                      </td>
+                      <td className="num discreto">
+                        {(j.amarelos ?? 0) + (j.vermelhos ?? 0) || "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="discreto" style={{ marginBottom: 0 }}>
+              Só jogos com estatística já extraída. Clique no nome para o perfil
+              completo.
+            </p>
+          </>
+        ) : (
+          <p className="discreto" style={{ marginBottom: 0 }}>
+            Estatística de jogador ainda não extraída para esta competição.
+          </p>
+        )}
+      </div>
+
       {/* ----------------------------------------------- confrontos */}
       <details className="cartao">
         <summary>
@@ -308,6 +389,13 @@ export default function TimePage() {
       </details>
     </>
   );
+}
+
+/** Nota vira cor: acima de 7 e boa, abaixo de 6 e ruim. */
+function classeDaNota(nota: number) {
+  if (nota >= 7) return "boa";
+  if (nota < 6) return "ruim";
+  return "media";
 }
 
 /** Cartao de metrica. A `nota` existe para desfazer ambiguidade de rotulo. */

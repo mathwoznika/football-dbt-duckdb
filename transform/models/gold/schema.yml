@@ -45,6 +45,80 @@ models:
           - accepted_values:
               values: ['V', 'E', 'D']
 
+  - name: gold_partida
+    description: >
+      Cabecalho de um jogo. E o UNICO mart no grao de partida — todos os outros
+      olham do ponto de vista de um time. A pagina de um jogo precisa dos dois
+      lados ao mesmo tempo.
+    columns:
+      - name: fixture_id
+        tests: [unique, not_null]
+      - name: time_casa_id
+        tests: [not_null]
+      - name: time_fora_id
+        tests: [not_null]
+
+  - name: gold_escalacao
+    description: >
+      Escalacao pronta para desenhar num campo. As coordenadas `linha` e
+      `coluna` vem do campo `grid` da API (formato "linha:coluna", 1:1 e o
+      goleiro), entao nenhuma formacao precisa ser codificada — o 4-2-3-1 e o
+      3-5-2 se desenham sozinhos.
+
+      `jogadores_na_linha` sai daqui e nao do front porque centralizar uma
+      linha de 4 zagueiros contra uma de 1 atacante e pergunta sobre o dado.
+      Reserva nao tem posicao: a API so posiciona quem comecou jogando.
+    columns:
+      - name: fixture_id
+        tests: [not_null]
+      - name: player_id
+        tests: [not_null]
+
+  - name: gold_partida_estatistica
+    description: >
+      Estatistica coletiva de um jogo, um lado por linha e os dois simetricos.
+      Diferente do silver_partida_estatistica, que traz "pro/contra" na
+      perspectiva de um time — a pagina de jogo compara os dois de igual para
+      igual e inverter um deles atrapalharia.
+    columns:
+      - name: fixture_id
+        tests: [not_null]
+      - name: team_id
+        tests: [not_null]
+
+  - name: gold_partida_evento
+    description: >
+      Linha do tempo de uma partida, com os papeis dos jogadores resolvidos.
+
+      O trabalho deste model e desambiguar os dois campos de jogador que a API
+      manda, porque o significado MUDA com o tipo do evento. Em substituicao a
+      convencao e o inverso do que os nomes sugerem: "player" e quem SAI e
+      "assist" e quem ENTRA — verificado nas 580 substituicoes da base.
+      A coluna `papel_relacionado` entrega isso resolvido.
+    columns:
+      - name: fixture_id
+        tests: [not_null]
+      - name: minuto
+        tests: [not_null]
+      - name: rotulo
+        description: Nome do lance em portugues, pronto para a tela.
+        tests: [not_null]
+
+  - name: gold_jogador_partida
+    description: >
+      Atuacao de um jogador em cada partida com o contexto do jogo ao lado,
+      para a pagina do jogador mostrar "7.8 contra o Palmeiras, vitoria por
+      2x1" numa linha so.
+
+      ATENCAO a cobertura: a onda 3 so cobre jogos do Coritiba, e o endpoint
+      devolve os DOIS times. Jogador de adversario aparece com 1 ou 2 jogos —
+      ver a nota sobre isso em docs/contexto.md antes de agregar como carreira.
+    columns:
+      - name: fixture_id
+        tests: [not_null]
+      - name: player_id
+        tests: [not_null]
+
   - name: gold_confronto_eliminatorio
     description: >
       Chaveamento do mata-mata. Grao: um CONFRONTO, nao uma partida — os dois

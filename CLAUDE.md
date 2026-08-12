@@ -15,9 +15,11 @@ apifootball.py     cliente da API-Football: HTTP, rate limit, gravação do raw
 extrair.py         o que extrair (ligas, temporadas, escopo). É o arquivo editado
 data/raw/          JSON cru, imutável, um arquivo por resposta da API
 data/warehouse.duckdb   banco de trabalho do dbt
-transform/         projeto dbt (23 models, 4 testes singulares)
+transform/         projeto dbt (28 models, 4 testes singulares)
 api/               nossa API (FastAPI) — não confundir com apifootball.py
 web/               front (Vite + React + TypeScript)
+docs/contexto.md   por que cada decisão foi tomada
+.claude/skills/    fluxos repetíveis (novo-dataset, fechar-dia)
 ```
 
 ## Comandos

@@ -80,6 +80,159 @@ export type ConfrontoEliminatorio = {
   data_fim: string;
 };
 
+export type Partida = {
+  fixture_id: number;
+  data: string;
+  season: number;
+  league_id: number;
+  league_nome: string;
+  rodada: string | null;
+  status: string;
+  estadio: string | null;
+  arbitro: string | null;
+  time_casa_id: number;
+  time_casa: string;
+  time_casa_logo: string | null;
+  gols_casa: number | null;
+  gols_casa_1t: number | null;
+  penaltis_casa: number | null;
+  time_fora_id: number;
+  time_fora: string;
+  time_fora_logo: string | null;
+  gols_fora: number | null;
+  gols_fora_1t: number | null;
+  penaltis_fora: number | null;
+};
+
+export type JogadorEscalado = {
+  team_id: number;
+  team_nome: string;
+  formacao: string | null;
+  tecnico: string | null;
+  player_id: number;
+  jogador: string;
+  camisa: number | null;
+  posicao: string | null;
+  titular: boolean;
+  /** 1 e o goleiro, crescendo em direcao ao ataque. Só titular tem. */
+  linha: number | null;
+  coluna: number | null;
+  jogadores_na_linha: number | null;
+  linhas_no_time: number | null;
+  minutos: number | null;
+  nota: number | null;
+  gols: number | null;
+  assistencias: number | null;
+  chutes: number | null;
+  chutes_no_gol: number | null;
+  passes: number | null;
+  desarmes: number | null;
+  duelos: number | null;
+  duelos_ganhos: number | null;
+  amarelos: number | null;
+  vermelhos: number | null;
+  entrou_do_banco: boolean | null;
+};
+
+export type EstatisticaDaPartida = {
+  team_id: number;
+  team_nome: string;
+  logo_url: string | null;
+  e_do_mandante: boolean;
+  posse_pct: number | null;
+  chutes_total: number | null;
+  chutes_no_gol: number | null;
+  chutes_fora: number | null;
+  chutes_bloqueados: number | null;
+  chutes_dentro_area: number | null;
+  escanteios: number | null;
+  impedimentos: number | null;
+  faltas: number | null;
+  cartoes_amarelos: number | null;
+  cartoes_vermelhos: number | null;
+  defesas_goleiro: number | null;
+  passes_total: number | null;
+  passes_certos: number | null;
+  precisao_passe_pct: number | null;
+};
+
+export type EventoDaPartida = {
+  minuto: number;
+  acrescimo: number | null;
+  tipo: string;
+  rotulo: string;
+  detalhe: string | null;
+  team_id: number;
+  team_nome: string;
+  e_do_mandante: boolean | null;
+  jogador_id: number | null;
+  jogador: string | null;
+  relacionado_id: number | null;
+  relacionado: string | null;
+  /** 'entrou' numa substituicao, 'assistencia' num gol. */
+  papel_relacionado: string | null;
+};
+
+export type JogadorNaTemporada = {
+  player_id: number;
+  jogador_nome: string;
+  team_id: number;
+  team_nome: string;
+  season: number;
+  league_id: number;
+  league_nome: string | null;
+  posicao: string | null;
+  jogos_com_dado: number;
+  jogos_titular: number;
+  minutos: number | null;
+  nota_media: number | null;
+  melhor_nota: number | null;
+  gols: number | null;
+  assistencias: number | null;
+  chutes: number | null;
+  chutes_no_gol: number | null;
+  passes: number | null;
+  desarmes: number | null;
+  duelos: number | null;
+  duelos_ganhos: number | null;
+  dribles_tentados: number | null;
+  dribles_certos: number | null;
+  faltas_cometidas: number | null;
+  amarelos: number | null;
+  vermelhos: number | null;
+  defesas: number | null;
+  gols_sofridos: number | null;
+};
+
+export type AtuacaoDoJogador = {
+  fixture_id: number;
+  data: string;
+  season: number;
+  league_id: number;
+  league_nome: string;
+  team_id: number;
+  team_nome: string;
+  adversario_id: number;
+  adversario_nome: string;
+  mando: string;
+  gols_time: number | null;
+  gols_adversario: number | null;
+  minutos: number | null;
+  posicao: string | null;
+  nota: number | null;
+  entrou_do_banco: boolean | null;
+  gols: number | null;
+  assistencias: number | null;
+  chutes: number | null;
+  chutes_no_gol: number | null;
+  passes: number | null;
+  desarmes: number | null;
+  duelos: number | null;
+  duelos_ganhos: number | null;
+  amarelos: number | null;
+  vermelhos: number | null;
+};
+
 export type LinhaClassificacao = {
   posicao: number;
   time_id: number;
@@ -196,4 +349,25 @@ export const api = {
     get<LinhaClassificacao[]>(
       `/competicoes/${league_id}/temporadas/${season}/classificacao`,
     ),
+
+  partida: (fixture_id: number) => get<Partida>(`/jogos/${fixture_id}`),
+
+  // vazio enquanto a onda 3 nao cobrir aquele jogo
+  escalacoes: (fixture_id: number) =>
+    get<JogadorEscalado[]>(`/jogos/${fixture_id}/escalacoes`),
+
+  estatisticasDaPartida: (fixture_id: number) =>
+    get<EstatisticaDaPartida[]>(`/jogos/${fixture_id}/estatisticas`),
+
+  eventosDaPartida: (fixture_id: number) =>
+    get<EventoDaPartida[]>(`/jogos/${fixture_id}/eventos`),
+
+  elenco: (team_id: number, season?: number, league_id?: number) =>
+    get<JogadorNaTemporada[]>(`/times/${team_id}/elenco${query({ season, league_id })}`),
+
+  temporadasDoJogador: (player_id: number) =>
+    get<JogadorNaTemporada[]>(`/jogadores/${player_id}/temporadas`),
+
+  jogosDoJogador: (player_id: number, season?: number, league_id?: number) =>
+    get<AtuacaoDoJogador[]>(`/jogadores/${player_id}/jogos${query({ season, league_id })}`),
 };

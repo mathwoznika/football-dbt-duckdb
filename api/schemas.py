@@ -147,6 +147,181 @@ class ConfrontoEliminatorio(BaseModel):
     data_fim: date
 
 
+class Partida(BaseModel):
+    """Cabecalho de um jogo, com os dois lados."""
+
+    fixture_id: int
+    data: date
+    season: int
+    league_id: int
+    league_nome: str
+    rodada: str | None = None
+    status: str
+    estadio: str | None = None
+    arbitro: str | None = None
+
+    time_casa_id: int
+    time_casa: str
+    time_casa_logo: str | None = None
+    gols_casa: int | None = None
+    gols_casa_1t: int | None = None
+    penaltis_casa: int | None = None
+
+    time_fora_id: int
+    time_fora: str
+    time_fora_logo: str | None = None
+    gols_fora: int | None = None
+    gols_fora_1t: int | None = None
+    penaltis_fora: int | None = None
+
+
+class JogadorEscalado(BaseModel):
+    """Um jogador na escalacao, com posicao no campo e a atuacao dele."""
+
+    team_id: int
+    team_nome: str
+    formacao: str | None = None
+    tecnico: str | None = None
+
+    player_id: int
+    jogador: str
+    camisa: int | None = None
+    posicao: str | None = Field(default=None, description="G, D, M ou F")
+    titular: bool
+
+    # Posicao no campo, vinda do "grid" da API. Só titular tem.
+    linha: int | None = Field(
+        default=None, description="1 e o goleiro, crescendo em direcao ao ataque"
+    )
+    coluna: int | None = Field(default=None, description="Posicao dentro da linha")
+    jogadores_na_linha: int | None = None
+    linhas_no_time: int | None = None
+
+    minutos: int | None = None
+    nota: float | None = None
+    gols: int | None = None
+    assistencias: int | None = None
+    chutes: int | None = None
+    chutes_no_gol: int | None = None
+    passes: int | None = None
+    desarmes: int | None = None
+    duelos: int | None = None
+    duelos_ganhos: int | None = None
+    amarelos: int | None = None
+    vermelhos: int | None = None
+    entrou_do_banco: bool | None = None
+
+
+class EstatisticaDaPartida(BaseModel):
+    """Estatistica coletiva de um dos lados de um jogo."""
+
+    team_id: int
+    team_nome: str
+    logo_url: str | None = None
+    e_do_mandante: bool
+    posse_pct: int | None = None
+    chutes_total: int | None = None
+    chutes_no_gol: int | None = None
+    chutes_fora: int | None = None
+    chutes_bloqueados: int | None = None
+    chutes_dentro_area: int | None = None
+    escanteios: int | None = None
+    impedimentos: int | None = None
+    faltas: int | None = None
+    cartoes_amarelos: int | None = None
+    cartoes_vermelhos: int | None = None
+    defesas_goleiro: int | None = None
+    passes_total: int | None = None
+    passes_certos: int | None = None
+    precisao_passe_pct: int | None = None
+
+
+class EventoDaPartida(BaseModel):
+    """Um lance da linha do tempo."""
+
+    minuto: int
+    acrescimo: int | None = None
+    tipo: str
+    rotulo: str = Field(description="Nome do lance em portugues, pronto para a tela")
+    detalhe: str | None = None
+    team_id: int
+    team_nome: str
+    e_do_mandante: bool | None = None
+    jogador_id: int | None = None
+    jogador: str | None = None
+    relacionado_id: int | None = None
+    relacionado: str | None = None
+    papel_relacionado: str | None = Field(
+        default=None,
+        description="O que o segundo jogador representa: 'entrou' numa "
+        "substituicao, 'assistencia' num gol.",
+    )
+
+
+class JogadorNaTemporada(BaseModel):
+    """Desempenho de um jogador numa competicao e temporada."""
+
+    player_id: int
+    jogador_nome: str
+    team_id: int
+    team_nome: str
+    season: int
+    league_id: int
+    league_nome: str | None = None
+    posicao: str | None = None
+    jogos_com_dado: int
+    jogos_titular: int
+    minutos: int | None = None
+    nota_media: float | None = None
+    melhor_nota: float | None = None
+    gols: int | None = None
+    assistencias: int | None = None
+    chutes: int | None = None
+    chutes_no_gol: int | None = None
+    passes: int | None = None
+    desarmes: int | None = None
+    duelos: int | None = None
+    duelos_ganhos: int | None = None
+    dribles_tentados: int | None = None
+    dribles_certos: int | None = None
+    faltas_cometidas: int | None = None
+    amarelos: int | None = None
+    vermelhos: int | None = None
+    defesas: int | None = None
+    gols_sofridos: int | None = None
+
+
+class AtuacaoDoJogador(BaseModel):
+    """Como um jogador foi numa partida especifica."""
+
+    fixture_id: int
+    data: date
+    season: int
+    league_id: int
+    league_nome: str
+    team_id: int
+    team_nome: str
+    adversario_id: int
+    adversario_nome: str
+    mando: str
+    gols_time: int | None = None
+    gols_adversario: int | None = None
+    minutos: int | None = None
+    posicao: str | None = None
+    nota: float | None = None
+    entrou_do_banco: bool | None = None
+    gols: int | None = None
+    assistencias: int | None = None
+    chutes: int | None = None
+    chutes_no_gol: int | None = None
+    passes: int | None = None
+    desarmes: int | None = None
+    duelos: int | None = None
+    duelos_ganhos: int | None = None
+    amarelos: int | None = None
+    vermelhos: int | None = None
+
+
 class LinhaClassificacao(BaseModel):
     """Uma linha da tabela de classificacao."""
 

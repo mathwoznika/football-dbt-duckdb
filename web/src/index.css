@@ -311,6 +311,133 @@ tr.destacada td {
   font-weight: 600;
 }
 
+/* ------------------------------------------------------ placar */
+
+.duas-colunas-iguais {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.placar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+.placar-time {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.05rem;
+}
+
+.placar-time.direita {
+  justify-content: flex-end;
+  flex-direction: row-reverse;
+}
+
+.placar-numeros {
+  text-align: center;
+  font-size: 2.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.placar-numeros .discreto {
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+/* ------------------------------------------------------- campo */
+
+/*
+ * O campo e um retangulo com proporcao fixa; os jogadores sao posicionados por
+ * porcentagem em cima dele. As marcacoes vem de um SVG esticado com
+ * preserveAspectRatio="none", entao acompanham qualquer largura.
+ */
+.campo {
+  position: relative;
+  aspect-ratio: 100 / 150;
+  width: 100%;
+  background: color-mix(in srgb, var(--vitoria) 12%, var(--fundo-2));
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.campo-linhas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: color-mix(in srgb, var(--texto) 22%, transparent);
+  stroke-width: 0.6;
+}
+
+.campo-jogador {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 74px;
+}
+
+.camisa {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: var(--fundo);
+  border: 2px solid var(--texto-2);
+  color: var(--texto);
+}
+
+/* a borda da camisa conta a nota da atuacao */
+.camisa.boa {
+  border-color: var(--vitoria);
+}
+.camisa.media {
+  border-color: var(--texto-2);
+}
+.camisa.ruim {
+  border-color: var(--derrota);
+}
+
+.campo-nome {
+  font-size: 0.66rem;
+  text-align: center;
+  line-height: 1.1;
+  background: color-mix(in srgb, var(--fundo) 82%, transparent);
+  border-radius: 3px;
+  padding: 0 2px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.campo-nota {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--texto-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.campo-link {
+  position: absolute;
+  inset: 0;
+}
+
 /* ---------------------------------------------------- chaveamento */
 
 /*
@@ -523,4 +650,137 @@ tr.destacada td {
 .caminho-desfecho.eliminado {
   background: color-mix(in srgb, var(--derrota) 18%, transparent);
   color: var(--derrota);
+}
+
+/* ------------------------------------------------------- botao */
+
+.botao {
+  display: inline-block;
+  padding: 0.22rem 0.6rem;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  color: var(--texto-2);
+  white-space: nowrap;
+}
+
+.botao:hover {
+  border-color: var(--destaque);
+  color: var(--destaque);
+  text-decoration: none;
+}
+
+/* nota de atuacao dentro de tabela */
+.nota {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.nota.boa {
+  color: var(--vitoria);
+}
+.nota.ruim {
+  color: var(--derrota);
+}
+
+/* -------------------------------------- estatisticas do jogo */
+
+.estat-linha {
+  display: grid;
+  grid-template-columns: 3rem 1fr 3rem;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.55rem;
+}
+
+.estat-valor {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.estat-rotulo {
+  display: block;
+  text-align: center;
+  font-size: 0.74rem;
+  color: var(--texto-2);
+  margin-bottom: 2px;
+}
+
+/*
+ * A barra divide o total entre os dois lados: 17 finalizacoes contra 7 vira
+ * 71% para a esquerda. Escalar pelo maximo absoluto faria a barra do maior
+ * encostar sempre no fim e diria menos.
+ */
+.estat-barra {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--borda);
+}
+
+.estat-barra .lado-casa {
+  background: var(--destaque);
+}
+
+.estat-barra .lado-fora {
+  background: color-mix(in srgb, var(--texto-2) 60%, transparent);
+}
+
+/* ------------------------------------------- linha do tempo */
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.timeline-item {
+  display: grid;
+  grid-template-columns: 2.6rem 1fr;
+  gap: 0.5rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 6px;
+  align-items: center;
+}
+
+.timeline-item:hover {
+  background: var(--fundo-2);
+}
+
+/* visitante fica recuado a direita, para separar os dois lados de relance */
+.timeline-item.fora {
+  margin-left: 22%;
+  background: color-mix(in srgb, var(--fundo-2) 60%, transparent);
+}
+
+.timeline-minuto {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+  color: var(--texto-2);
+  text-align: right;
+}
+
+.timeline-corpo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.timeline-icone {
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.timeline-principal {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.timeline-nota {
+  font-size: 0.74rem;
 }

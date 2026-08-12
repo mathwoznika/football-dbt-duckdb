@@ -136,6 +136,38 @@ Coritiba, então gols em Palmeiras × Flamengo não existem aqui. O
 daquele jogo — o Coritiba aparece como `#ffffff`. Para tematizar por clube seria
 preciso uma tabela curada, provavelmente um seed do dbt.
 
+**Substituição inverte o que os nomes sugerem.** Nos eventos de tipo `subst`, o
+campo `player` é quem **sai** e `assist` é quem **entra**. Verificado nas 580
+substituições da base: em 580 de 580 o "assist" era reserva na escalação, e em
+577 o "player" era titular (as 3 restantes são reservas que entraram e depois
+saíram). O `gold_partida_evento` resolve isso na coluna `papel_relacionado`,
+para a tela não precisar saber da peculiaridade.
+
+**A escalação vem com coordenadas.** O `grid` do lineup traz `"linha:coluna"` —
+`1:1` é o goleiro, e a linha cresce em direção ao ataque. Isso significa que
+desenhar o campinho **não exige codificar formação nenhuma**: o 4-2-3-1 e o
+3-5-2 se posicionam sozinhos. Só o titular tem `grid`; reserva vem nulo.
+
+**Estatística de jogador é 90% ruído fora do Coritiba.** O `fixture_players`
+devolve os **dois** times de cada partida, e a onda 3 só cobre jogos do Coxa.
+O resultado são 671 jogadores na base, mas:
+
+```
+317 jogadores com  1 jogo
+292 jogadores com  2-3
+ 24 com 4-10 · 22 com 11-25 · 16 com 26+
+```
+
+Os 62 jogadores do Coritiba somam 986 atuações; os 617 adversários somam 978 no
+total. Agregar isso como "estatística de carreira" seria enganoso — o Hulk
+aparece com uma partida. Qualquer tela sobre jogador precisa mostrar
+`jogos_com_dado` e filtrar amostra mínima.
+
+Para uma base real de jogadores existe o `/players?league&season`, que devolve a
+temporada inteira de todos independentemente de adversário. Ele **pagina** —
+algo como 30 páginas por liga-temporada, ~270 requisições para os 9 pares. São
+3 dias de cota Free, ou minutos no plano pago.
+
 ## Concorrência: por que Postgres entra depois
 
 O DuckDB aceita **ou** um processo escrevendo **ou** vários lendo. Isso já
@@ -148,10 +180,24 @@ aninhados, e o DuckDB é ruim em servir leitura concorrente. Cada um onde é for
 
 ## Ordem planejada do que falta
 
-1. Artilheiros (extração feita, models e painel pendentes)
-2. ML com MLflow — `gold_features_partida` já tem 3.492 linhas prontas e **não
-   depende da onda 3**
-3. Postgres como camada de serving
-4. Dagster, por último: ele resolve orquestração de várias etapas
-   interdependentes, e orquestrar duas coisas rodadas à mão é cerimônia
-5. docker-compose, junto com o Dagster
+1. **Terminar a onda 3** — ~424 requisições, uns 4 dias. É o que mais entrega
+   valor por requisição, então vem antes de qualquer extração nova.
+2. **Artilheiros** — as 9 tarefas já estão na fila do extrator; faltam o
+   `bronze_topscorers`, o `gold_artilheiro` e o painel abaixo da classificação.
+3. **Listagem de jogadores** com busca e filtro de amostra mínima. Barata, usa o
+   que já existe e completa a navegação — hoje só se chega num jogador a partir
+   de um jogo ou do elenco.
+4. **Análises pré-ML** que a base já sustenta: momento dos gols por faixa de 15
+   minutos, desempenho por tempo e viradas (esta funciona nos 1.746 jogos, sem
+   depender da onda 3), impacto do técnico, e por fim estatística contra
+   resultado — que é exploração de feature disfarçada de análise.
+5. **ML com MLflow** — `gold_features_partida` já tem 3.492 linhas prontas e
+   **não depende da onda 3**.
+6. **Postgres** como camada de serving, quando a aplicação for para o ar.
+7. **Dagster**, por último: ele resolve orquestração de várias etapas
+   interdependentes, e orquestrar duas coisas rodadas à mão é cerimônia.
+8. **docker-compose**, junto com o Dagster. É aqui que o MinIO entra, se a ideia
+   de exercitar object storage for retomada.
+
+Condicionado ao plano pago: `/players` completo sobe para o topo, porque deixa
+de custar 3 dias de cota e passa a custar minutos.

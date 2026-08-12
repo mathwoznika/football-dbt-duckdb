@@ -14,10 +14,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.db import consultar
 from api.schemas import (
+    AtuacaoDoJogador,
     Confronto,
     ConfrontoEliminatorio,
+    EstatisticaDaPartida,
+    EventoDaPartida,
+    JogadorEscalado,
+    JogadorNaTemporada,
     JogoDaCampanha,
     LinhaClassificacao,
+    Partida,
     TemporadaDoTime,
     Time,
 )
@@ -148,6 +154,161 @@ def confrontos_do_time(
         order by jogos desc, aproveitamento_pct desc
         """,
         [team_id, min_jogos],
+    )
+
+
+# ---------------------------------------------------------------- jogos
+
+
+@app.get("/jogos/{fixture_id}", response_model=Partida)
+def partida(fixture_id: int):
+    """Cabecalho de um jogo: placar, competicao, estadio e arbitro."""
+    linhas = consultar(
+        """
+        select fixture_id, data, season, league_id, league_nome, rodada, status,
+               estadio, arbitro,
+               time_casa_id, time_casa, time_casa_logo, gols_casa, gols_casa_1t,
+               penaltis_casa,
+               time_fora_id, time_fora, time_fora_logo, gols_fora, gols_fora_1t,
+               penaltis_fora
+        from gold_partida
+        where fixture_id = ?
+        """,
+        [fixture_id],
+    )
+    if not linhas:
+        raise HTTPException(status_code=404, detail="jogo nao encontrado")
+    return linhas[0]
+
+
+@app.get("/jogos/{fixture_id}/escalacoes", response_model=list[JogadorEscalado])
+def escalacoes(fixture_id: int):
+    """Escalacao dos dois times, com posicao no campo e atuacao de cada um.
+
+    Devolve lista vazia quando a escalacao ainda nao foi extraida — a onda 3
+    esta em andamento e cobre parte dos jogos.
+    """
+    return consultar(
+        """
+        select team_id, team_nome, formacao, tecnico,
+               player_id, jogador, camisa, posicao, titular,
+               linha, coluna, jogadores_na_linha, linhas_no_time,
+               minutos, nota, gols, assistencias, chutes, chutes_no_gol,
+               passes, desarmes, duelos, duelos_ganhos, amarelos, vermelhos,
+               entrou_do_banco
+        from gold_escalacao
+        where fixture_id = ?
+        order by team_id, titular desc, linha, coluna, camisa
+        """,
+        [fixture_id],
+    )
+
+
+@app.get("/jogos/{fixture_id}/estatisticas", response_model=list[EstatisticaDaPartida])
+def estatisticas_da_partida(fixture_id: int):
+    """Estatistica coletiva dos dois lados. Vazio se a onda 3 nao cobriu."""
+    return consultar(
+        """
+        select team_id, team_nome, logo_url, e_do_mandante, posse_pct,
+               chutes_total, chutes_no_gol, chutes_fora, chutes_bloqueados,
+               chutes_dentro_area, escanteios, impedimentos, faltas,
+               cartoes_amarelos, cartoes_vermelhos, defesas_goleiro,
+               passes_total, passes_certos, precisao_passe_pct
+        from gold_partida_estatistica
+        where fixture_id = ?
+        order by e_do_mandante desc
+        """,
+        [fixture_id],
+    )
+
+
+@app.get("/jogos/{fixture_id}/eventos", response_model=list[EventoDaPartida])
+def eventos_da_partida(fixture_id: int):
+    """Linha do tempo do jogo, do primeiro lance ao ultimo."""
+    return consultar(
+        """
+        select minuto, acrescimo, tipo, rotulo, detalhe, team_id, team_nome,
+               e_do_mandante, jogador_id, jogador, relacionado_id, relacionado,
+               papel_relacionado
+        from gold_partida_evento
+        where fixture_id = ?
+        order by minuto, coalesce(acrescimo, 0)
+        """,
+        [fixture_id],
+    )
+
+
+# ------------------------------------------------------------ jogadores
+
+
+@app.get("/times/{team_id}/elenco", response_model=list[JogadorNaTemporada])
+def elenco(
+    team_id: int,
+    season: int | None = Query(default=None),
+    league_id: int | None = Query(default=None),
+):
+    """Desempenho de cada jogador do elenco, por competicao e temporada."""
+    return consultar(
+        """
+        select player_id, jogador_nome, team_id, team_nome, season, league_id,
+               league_nome, posicao, jogos_com_dado, jogos_titular, minutos, nota_media,
+               melhor_nota, gols, assistencias, chutes, chutes_no_gol, passes,
+               desarmes, duelos, duelos_ganhos, dribles_tentados,
+               dribles_certos, faltas_cometidas, amarelos, vermelhos,
+               defesas, gols_sofridos
+        from gold_jogador_temporada
+        where team_id = ?
+          and (? is null or season = ?)
+          and (? is null or league_id = ?)
+        order by minutos desc nulls last
+        """,
+        [team_id, season, season, league_id, league_id],
+    )
+
+
+@app.get("/jogadores/{player_id}/temporadas", response_model=list[JogadorNaTemporada])
+def temporadas_do_jogador(player_id: int):
+    """Uma linha por competicao e temporada em que o jogador atuou."""
+    linhas = consultar(
+        """
+        select player_id, jogador_nome, team_id, team_nome, season, league_id,
+               league_nome, posicao, jogos_com_dado, jogos_titular, minutos, nota_media,
+               melhor_nota, gols, assistencias, chutes, chutes_no_gol, passes,
+               desarmes, duelos, duelos_ganhos, dribles_tentados,
+               dribles_certos, faltas_cometidas, amarelos, vermelhos,
+               defesas, gols_sofridos
+        from gold_jogador_temporada
+        where player_id = ?
+        order by season desc, minutos desc nulls last
+        """,
+        [player_id],
+    )
+    if not linhas:
+        raise HTTPException(status_code=404, detail="jogador nao encontrado")
+    return linhas
+
+
+@app.get("/jogadores/{player_id}/jogos", response_model=list[AtuacaoDoJogador])
+def jogos_do_jogador(
+    player_id: int,
+    season: int | None = Query(default=None),
+    league_id: int | None = Query(default=None),
+):
+    """Atuacao partida a partida, com o contexto do jogo."""
+    return consultar(
+        """
+        select fixture_id, data, season, league_id, league_nome, team_id,
+               team_nome, adversario_id, adversario_nome, mando, gols_time,
+               gols_adversario, minutos, posicao, nota, entrou_do_banco, gols,
+               assistencias, chutes, chutes_no_gol, passes, desarmes, duelos,
+               duelos_ganhos, amarelos, vermelhos
+        from gold_jogador_partida
+        where player_id = ?
+          and (? is null or season = ?)
+          and (? is null or league_id = ?)
+        order by data
+        """,
+        [player_id, season, season, league_id, league_id],
     )
 
 

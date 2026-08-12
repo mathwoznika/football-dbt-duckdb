@@ -8,6 +8,13 @@ with atuacoes as (
 
     select * from {{ ref('bronze_fixture_players') }}
 
+),
+
+-- o payload por jogador so traz o id da liga; o nome vem do catalogo
+competicoes as (
+
+    select distinct league_id, league_nome from {{ ref('bronze_leagues') }}
+
 )
 
 select
@@ -17,6 +24,7 @@ select
     team_nome,
     season,
     league_id,
+    any_value(league_nome) as league_nome,
 
     count(*)                                                as jogos_com_dado,
     sum(case when entrou_do_banco then 0 else 1 end)        as jogos_titular,
@@ -48,4 +56,5 @@ select
     -- posicao mais frequente do jogador na temporada
     mode(posicao)                                           as posicao
 from atuacoes
+left join competicoes using (league_id)
 group by all
