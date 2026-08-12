@@ -37,10 +37,12 @@ visao_casa as (
         time_casa    as time_nome,
         time_fora_id as adversario_id,
         time_fora    as adversario_nome,
-        gols_casa    as gols_pro,
-        gols_fora    as gols_contra,
-        gols_casa_1t as gols_pro_1t,
-        gols_fora_1t as gols_contra_1t
+        gols_casa     as gols_pro,
+        gols_fora     as gols_contra,
+        gols_casa_1t  as gols_pro_1t,
+        gols_fora_1t  as gols_contra_1t,
+        penaltis_casa as penaltis_pro,
+        penaltis_fora as penaltis_contra
     from jogos
 
 ),
@@ -60,10 +62,12 @@ visao_fora as (
         time_fora    as time_nome,
         time_casa_id as adversario_id,
         time_casa    as adversario_nome,
-        gols_fora    as gols_pro,
-        gols_casa    as gols_contra,
-        gols_fora_1t as gols_pro_1t,
-        gols_casa_1t as gols_contra_1t
+        gols_fora     as gols_pro,
+        gols_casa     as gols_contra,
+        gols_fora_1t  as gols_pro_1t,
+        gols_casa_1t  as gols_contra_1t,
+        penaltis_fora as penaltis_pro,
+        penaltis_casa as penaltis_contra
     from jogos
 
 ),

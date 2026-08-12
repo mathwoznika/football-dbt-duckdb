@@ -18,16 +18,52 @@ models:
         tests: [not_null]
       - name: pontos
         tests: [not_null]
+      - name: ultimos_5
+        description: >
+          Resultados dos 5 ultimos jogos em ORDEM CRONOLOGICA — o primeiro
+          caractere e o mais antigo e o ultimo e o jogo mais recente. A ordem e
+          essa de proposito: assim quem desenha percorre da esquerda para a
+          direita e o jogo mais recente cai na direita.
 
   - name: gold_time_temporada
     description: >
       Cabecalho da pagina de um time: uma linha por competicao disputada na
-      temporada, copa inclusive. A coluna posicao so vem preenchida onde faz
-      sentido (pontos corridos).
+      temporada, copa inclusive.
+
+      Cuidado com duas colunas. `maior_invencibilidade` e a MAIOR sequencia
+      invicta da temporada, um recorde, nao o estado atual — para o atual use
+      jogos_sem_derrota / jogos_sem_vitoria. E `posicao` e a colocacao na
+      tabela de pontos corridos, que num torneio com mata-mata descreve a fase
+      de grupos e nao a campanha; para isso use `resultado_final`.
     columns:
       - name: time_id
         tests: [not_null]
       - name: jogos
+        tests: [not_null]
+      - name: ultimo_resultado
+        tests:
+          - accepted_values:
+              values: ['V', 'E', 'D']
+
+  - name: gold_confronto_eliminatorio
+    description: >
+      Chaveamento do mata-mata. Grao: um CONFRONTO, nao uma partida — os dois
+      jogos de ida e volta viram uma linha, com o placar agregado.
+
+      O vencedor sai do agregado de gols e, se empatado, dos penaltis. Quando
+      nem isso resolve, e inferido por presenca numa fase posterior, o que cobre
+      qualquer regra de desempate sem precisar modela-la.
+    columns:
+      - name: league_id
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
+      - name: ordem_fase
+        description: 1=primeira fase ... 7=final. Serve para ordenar o chaveamento.
+        tests: [not_null]
+      - name: time_a_id
+        tests: [not_null]
+      - name: time_b_id
         tests: [not_null]
 
   - name: gold_evolucao_classificacao
@@ -72,12 +108,17 @@ models:
       - name: jogos
         tests: [not_null]
 
-  - name: gold_coritiba_campanha
+  - name: gold_campanha
     description: >
-      Campanha do clube jogo a jogo, com acumulados e forma. O time e uma
-      variavel: dbt run --vars '{time_id: 128}' gera a de outro clube.
+      Campanha jogo a jogo de todos os times, com pontos acumulados e forma
+      dos 5 jogos anteriores. Universal: o filtro de clube e um where de quem
+      consulta, nao uma decisao do model.
     columns:
       - name: fixture_id
+        tests: [not_null]
+      - name: time_id
+        tests: [not_null]
+      - name: jogo_n
         tests: [not_null]
 
   - name: gold_features_partida

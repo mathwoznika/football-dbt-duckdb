@@ -21,7 +21,7 @@ Sao extraidos dois calendarios diferentes, e a distincao importa:
 import collections
 import json
 
-import api
+import apifootball
 
 TIME = 147  # Coritiba
 SEASONS = [2022, 2023, 2024]  # janela que o plano Free libera
@@ -49,7 +49,7 @@ def jogos_conhecidos():
     # Le apenas o dataset "fixtures" (jogos do Coritiba), nunca "fixtures_liga":
     # a onda 3 custa 4 requests por jogo, e incluir aqui os jogos das ligas
     # inteiras levaria o escopo de 672 para mais de 7.000 requisicoes.
-    for arquivo in sorted(api.RAW.glob("fixtures/season=*/*.json")):
+    for arquivo in sorted(apifootball.RAW.glob("fixtures/season=*/*.json")):
         documento = json.loads(arquivo.read_text(encoding="utf-8"))
         for jogo in documento.get("response", []):
             if jogo["fixture"]["status"]["short"] in ENCERRADO:
@@ -99,6 +99,17 @@ def montar_tarefas():
             ("fixtures_liga", "fixtures", {"league": liga, "season": season},
              f"season={season}/league={liga}")
         )
+        # Artilheiros oficiais da competicao. Um request devolve a lista inteira.
+        #
+        # Vale explicar por que este endpoint existe no catalogo: gol de jogador
+        # tambem esta em fixture_events, mas a onda 3 cobre so os jogos do
+        # Coritiba — gols marcados em Palmeiras x Flamengo nao entram na nossa
+        # base. Artilharia da competicao exigiria os 1.746 jogos detalhados
+        # (~7.000 requests). Aqui sao 9.
+        tarefas.append(
+            ("topscorers", "players/topscorers", {"league": liga, "season": season},
+             f"season={season}/league={liga}")
+        )
 
     # Onda 3 — o grosso do custo: quatro requests por jogo encerrado.
     for season, liga, jogo in jogos:
@@ -112,7 +123,7 @@ def montar_tarefas():
 
 
 def pendentes():
-    return [t for t in montar_tarefas() if not api.ja_extraido(t[0], t[3])]
+    return [t for t in montar_tarefas() if not apifootball.ja_extraido(t[0], t[3])]
 
 
 def resumo(tarefas):
@@ -144,18 +155,18 @@ def main():
             if gastos >= ORCAMENTO:
                 break
             try:
-                payload = api.buscar(endpoint, params)
-            except api.RecusadoPelaAPI as erro:
+                payload = apifootball.buscar(endpoint, params)
+            except apifootball.RecusadoPelaAPI as erro:
                 # Nao da para insistir: ou a cota acabou, ou o plano nao cobre
                 # o que pedimos. Sai limpo, dizendo o que ficou faltando.
                 print(f"\nA API recusou: {erro}")
                 print(f"{gastos} requisicao(oes) gastas. Restam {len(pendentes())} tarefa(s).")
                 return
             gastos += 1
-            api.salvar_raw(dataset, caminho, endpoint, params, payload)
+            apifootball.salvar_raw(dataset, caminho, endpoint, params, payload)
             print(
                 f"[{gastos:4}/{ORCAMENTO}] {dataset:20} {caminho:36} "
-                f"results={payload.get('results')} cota={api.cota_restante}"
+                f"results={payload.get('results')} cota={apifootball.cota_restante}"
             )
 
     print(f"\n{gastos} requisicao(oes) gastas. Restam {len(pendentes())} tarefa(s).")

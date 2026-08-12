@@ -33,6 +33,31 @@ elegiveis as (
 
 ),
 
+-- Os 5 ultimos resultados de cada time, em ORDEM CRONOLOGICA (o mais antigo
+-- primeiro). A ordem importa: assim o front desenha da esquerda para a direita
+-- e o jogo mais recente cai na direita, como na tabela do Google.
+--
+-- O qualify corta os 5 mais recentes, e o string_agg os junta de volta na ordem
+-- certa — sao dois ORDER BY em sentidos opostos, de proposito.
+ultimos_cinco as (
+
+    select
+        league_id,
+        season,
+        time_id,
+        string_agg(resultado, '' order by data_hora_utc) as ultimos_5
+    from (
+        select league_id, season, time_id, resultado, data_hora_utc
+        from elegiveis
+        qualify row_number() over (
+            partition by league_id, season, time_id
+            order by data_hora_utc desc
+        ) <= 5
+    )
+    group by all
+
+),
+
 agregado as (
 
     select
@@ -57,10 +82,21 @@ agregado as (
 )
 
 select
-    *,
-    round(100.0 * pontos / (jogos * 3), 1) as aproveitamento_pct,
+    agregado.*,
+    round(100.0 * agregado.pontos / (agregado.jogos * 3), 1) as aproveitamento_pct,
     row_number() over (
-        partition by league_id, season
-        order by pontos desc, vitorias desc, saldo desc, gols_pro desc
-    ) as posicao
+        partition by agregado.league_id, agregado.season
+        order by agregado.pontos desc, agregado.vitorias desc,
+                 agregado.saldo desc, agregado.gols_pro desc
+    ) as posicao,
+    ultimos_cinco.ultimos_5,
+    -- o escudo vem da dimensao, para a tabela nao precisar de um join extra
+    -- do lado de quem consulta
+    silver_time.logo_url
 from agregado
+left join ultimos_cinco
+       on ultimos_cinco.league_id = agregado.league_id
+      and ultimos_cinco.season    = agregado.season
+      and ultimos_cinco.time_id   = agregado.time_id
+left join {{ ref('silver_time') }} as silver_time
+       on silver_time.team_id = agregado.time_id

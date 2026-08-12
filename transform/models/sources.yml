@@ -12,6 +12,7 @@ sources:
       - name: standings
       - name: coachs
       - name: transfers
+      - name: topscorers
       - name: fixture_statistics
       - name: fixture_events
       - name: fixture_lineups

@@ -1,0 +1,526 @@
+/*
+ * Estilos do app. Um sistema pequeno, sem framework.
+ *
+ * As cores vivem em variaveis no :root e sao redefinidas no bloco de tema
+ * escuro. Assim nenhum componente conhece cor literal — todos usam var(),
+ * e trocar a paleta e mexer aqui.
+ */
+
+:root {
+  --fundo: #ffffff;
+  --fundo-2: #f6f7f9;
+  --borda: #e3e6ea;
+  --texto: #16191d;
+  --texto-2: #6b7280;
+  --destaque: #0b6b3a; /* verde do Coxa */
+  --vitoria: #16a34a;
+  --empate: #a16207;
+  --derrota: #dc2626;
+
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: #14171a;
+    --fundo-2: #1c2024;
+    --borda: #2c3238;
+    --texto: #e8eaed;
+    --texto-2: #9aa3ad;
+    --destaque: #3fbf7f;
+    --vitoria: #4ade80;
+    --empate: #fbbf24;
+    --derrota: #f87171;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--texto);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------- estrutura */
+
+.topo {
+  border-bottom: 1px solid var(--borda);
+  background: var(--fundo-2);
+  padding: 0.9rem 1.5rem;
+}
+
+.topo strong {
+  color: var(--destaque);
+}
+
+.conteudo {
+  /* largo porque a tela do time mostra duas tabelas grandes lado a lado */
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.cartao {
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+  background: var(--fundo);
+}
+
+.cartao > h2 {
+  margin: 0 0 0.8rem;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--texto-2);
+}
+
+/* seção que abre e fecha, usando o <details> nativo do HTML */
+summary {
+  cursor: pointer;
+}
+
+.titulo-summary {
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--texto-2);
+  font-weight: 600;
+}
+
+.linha {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* -------------------------------------------------------------- texto */
+
+.discreto {
+  color: var(--texto-2);
+  font-size: 0.9rem;
+}
+
+.numero {
+  font-variant-numeric: tabular-nums; /* alinha digitos em coluna */
+}
+
+/* ------------------------------------------------------------ tabelas */
+
+/* O container rola sozinho no horizontal: a pagina nunca rola de lado. */
+.tabela-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--texto-2);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--borda);
+  white-space: nowrap;
+}
+
+td {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--borda);
+  white-space: nowrap;
+}
+
+tbody tr:hover {
+  background: var(--fundo-2);
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------ V / E / D */
+
+.pill {
+  display: inline-block;
+  min-width: 1.4rem;
+  text-align: center;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.pill.V {
+  background: var(--vitoria);
+}
+.pill.E {
+  background: var(--empate);
+}
+.pill.D {
+  background: var(--derrota);
+}
+
+/* --------------------------------------------------------- controles */
+
+input,
+select {
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: var(--fundo);
+  color: var(--texto);
+}
+
+input:focus,
+select:focus {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
+}
+
+/* ------------------------------------------------------------ metricas */
+
+.metricas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.8rem;
+}
+
+.metrica {
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+  background: var(--fundo-2);
+}
+
+.metrica .rotulo {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--texto-2);
+}
+
+.metrica .valor {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.escudo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+}
+
+/* ------------------------------------------------- duas colunas */
+
+/*
+ * As duas colunas sao quase iguais porque as duas tabelas sao grandes: a
+ * campanha tem 9 colunas e a classificacao, 12. O minmax(0, ...) e o que
+ * impede uma tabela larga de esticar a coluna e estourar o grid — sem ele,
+ * o conteudo manda no tamanho em vez do layout.
+ */
+.duas-colunas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 1200px) {
+  .duas-colunas {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* a coluna da classificacao acompanha a rolagem da campanha, que e mais longa */
+.coluna-lateral {
+  position: sticky;
+  top: 1rem;
+}
+
+.tabela-compacta {
+  font-size: 0.8rem;
+}
+
+.tabela-compacta td,
+.tabela-compacta th {
+  padding: 0.3rem 0.35rem;
+}
+
+/* ------------------------------------------------- ultimas 5 */
+
+.ultimas5 {
+  display: inline-flex;
+  gap: 0.18rem;
+}
+
+/* bolinhas pequenas: o resultado mais recente fica na direita, como no Google */
+.pill-mini {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.pill-mini.V {
+  background: var(--vitoria);
+}
+.pill-mini.E {
+  background: var(--empate);
+}
+.pill-mini.D {
+  background: var(--derrota);
+}
+
+/* linha do time que esta sendo visto */
+tr.destacada {
+  background: color-mix(in srgb, var(--destaque) 16%, transparent);
+}
+
+tr.destacada td {
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------- chaveamento */
+
+/*
+ * Cada fase e uma coluna; o container rola no horizontal quando a chave e
+ * longa (Copa do Brasil tem 7 fases).
+ */
+.chave {
+  display: flex;
+  gap: 1.2rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  align-items: stretch;
+}
+
+.chave-fase {
+  min-width: 230px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.chave-fase > h3 {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--texto-2);
+  position: sticky;
+  top: 0;
+  background: var(--fundo);
+  padding-bottom: 0.2rem;
+}
+
+.confronto {
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  background: var(--fundo-2);
+  font-size: 0.88rem;
+}
+
+/* confronto em que o time visto esteve */
+.confronto.envolvido {
+  border-color: var(--destaque);
+}
+
+.confronto-time {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.12rem 0;
+}
+
+/* quem perdeu fica apagado: a hierarquia visual conta quem passou */
+.confronto-time.perdeu {
+  color: var(--texto-2);
+}
+
+.confronto-time.passou {
+  font-weight: 700;
+}
+
+.confronto-time .gols {
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* nome + escudo do clube dentro do cartao de confronto */
+.confronto-clube {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.confronto-clube img {
+  flex-shrink: 0;
+}
+
+.confronto-clube a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.confronto-nota {
+  color: var(--texto-2);
+  font-size: 0.74rem;
+  margin-top: 0.25rem;
+}
+
+.faixa {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--destaque) 20%, transparent);
+  color: var(--destaque);
+}
+
+/* ------------------------------------- caminho do time no torneio */
+
+.caminho {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+/* cada item e o cartao mais o conector que o liga ao proximo */
+.caminho-item {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.caminho-passo {
+  border: 1px solid var(--borda);
+  border-left: 3px solid var(--borda);
+  border-radius: 8px;
+  padding: 0.55rem 0.8rem;
+  background: var(--fundo-2);
+  min-width: 150px;
+}
+
+/* a borda esquerda conta o resultado de cada fase de relance */
+.caminho-passo.passou {
+  border-left-color: var(--vitoria);
+}
+
+.caminho-passo.caiu {
+  border-left-color: var(--derrota);
+}
+
+.caminho-fase {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--texto-2);
+}
+
+.caminho-linha {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin: 0.15rem 0;
+}
+
+.caminho-adv {
+  font-size: 0.85rem;
+}
+
+.caminho-nota {
+  font-size: 0.7rem;
+  color: var(--texto-2);
+  margin-top: 0.15rem;
+}
+
+/*
+ * A seta e feita so com CSS: uma linha horizontal (o proprio elemento) e um
+ * triangulo no fim (a borda do ::after). Sem imagem, sem svg.
+ */
+.caminho-seta {
+  width: 34px;
+  height: 2px;
+  background: var(--borda);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.caminho-seta::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: -4px;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid var(--borda);
+}
+
+.caminho-desfecho {
+  margin-left: 0.9rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  align-self: center;
+}
+
+.caminho-desfecho .trofeu {
+  margin-right: 0.35rem;
+}
+
+.caminho-desfecho.campeao {
+  background: color-mix(in srgb, var(--vitoria) 22%, transparent);
+  color: var(--vitoria);
+}
+
+.caminho-desfecho.vice {
+  background: color-mix(in srgb, var(--empate) 22%, transparent);
+  color: var(--empate);
+}
+
+.caminho-desfecho.eliminado {
+  background: color-mix(in srgb, var(--derrota) 18%, transparent);
+  color: var(--derrota);
+}

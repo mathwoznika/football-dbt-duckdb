@@ -1,9 +1,19 @@
 -- Cabecalho da pagina de um time. Grao: (time, competicao, temporada).
 --
--- Diferente do gold_classificacao, aqui entram TODAS as competicoes, copa
--- inclusive — porque a pagina do clube mostra a temporada inteira:
--- "Serie A: 16o, 42 pts | Copa do Brasil: 4 jogos | Paranaense: 37 pts".
--- A coluna posicao so vem preenchida onde faz sentido (pontos corridos).
+-- Entram TODAS as competicoes, copa inclusive, porque a pagina do clube mostra
+-- a temporada inteira.
+--
+-- Duas colunas aqui exigem cuidado e ja causaram leitura errada na tela:
+--
+--   maior_invencibilidade  e a MAIOR sequencia invicta da temporada, um recorde
+--                          historico. Nao e "esta invicto ha N jogos".
+--   posicao                e a colocacao na tabela de PONTOS CORRIDOS. Num
+--                          torneio com mata-mata ela descreve a fase de grupos
+--                          e nao a campanha: o Coritiba foi 2o no grupo do
+--                          Paranaense 2022 e campeao do torneio.
+--
+-- Para o estado atual use jogos_sem_derrota / jogos_sem_vitoria.
+-- Para a campanha em mata-mata use resultado_final.
 
 with jogos as (
 
@@ -12,9 +22,7 @@ with jogos as (
 ),
 
 -- Gaps and islands para a maior sequencia invicta: a soma acumulada de
--- derrotas so muda quando o time perde, entao ela funciona como um numero de
--- bloco. Dentro de cada bloco, contar os jogos sem derrota da o tamanho da
--- invencibilidade.
+-- derrotas so muda quando o time perde, entao funciona como numero de bloco.
 blocos as (
 
     select
@@ -48,6 +56,58 @@ invencibilidade as (
 
 ),
 
+-- Sequencia ATUAL: quantos jogos se passaram desde a ultima derrota e desde a
+-- ultima vitoria. E a conta simples de "total de jogos menos a posicao do
+-- ultimo jogo daquele tipo" — se nunca perdeu, o coalesce devolve 0 e a
+-- sequencia vira o total.
+ordenado as (
+
+    select
+        *,
+        row_number() over (
+            partition by time_id, league_id, season
+            order by data_hora_utc
+        ) as n
+    from jogos
+
+),
+
+sequencia_atual as (
+
+    select
+        time_id,
+        league_id,
+        season,
+        count(*) - coalesce(max(n) filter (where resultado = 'D'), 0) as jogos_sem_derrota,
+        count(*) - coalesce(max(n) filter (where resultado = 'V'), 0) as jogos_sem_vitoria,
+        arg_max(resultado, n)                                        as ultimo_resultado
+    from ordenado
+    group by all
+
+),
+
+-- Campanha no mata-mata: ate que fase o time chegou e o que aconteceu la.
+participacoes as (
+
+    select league_id, season, time_a_id as time_id, ordem_fase, fase_nome, vencedor_id
+    from {{ ref('gold_confronto_eliminatorio') }}
+    union all
+    select league_id, season, time_b_id as time_id, ordem_fase, fase_nome, vencedor_id
+    from {{ ref('gold_confronto_eliminatorio') }}
+
+),
+
+fase_mais_longe as (
+
+    select league_id, season, time_id, ordem_fase, fase_nome, vencedor_id
+    from participacoes
+    qualify row_number() over (
+        partition by league_id, season, time_id
+        order by ordem_fase desc
+    ) = 1
+
+),
+
 agregado as (
 
     select
@@ -78,13 +138,44 @@ agregado as (
 select
     agregado.*,
     round(100.0 * agregado.pontos / (agregado.jogos * 3), 1) as aproveitamento_pct,
+
     invencibilidade.maior_invencibilidade,
-    classificacao.posicao
+    sequencia_atual.jogos_sem_derrota,
+    sequencia_atual.jogos_sem_vitoria,
+    sequencia_atual.ultimo_resultado,
+
+    classificacao.posicao,
+
+    -- A resposta honesta para "como foi a campanha". Prefere o mata-mata
+    -- quando ele existe, porque e ele que define o torneio.
+    case
+        when fase_mais_longe.ordem_fase = 7
+             and fase_mais_longe.vencedor_id = agregado.time_id then 'Campeão'
+        when fase_mais_longe.ordem_fase = 7 then 'Vice-campeão'
+        when fase_mais_longe.time_id is not null
+             and fase_mais_longe.vencedor_id = agregado.time_id
+             then 'Classificado — ' || fase_mais_longe.fase_nome
+        when fase_mais_longe.time_id is not null
+             then 'Eliminado — ' || fase_mais_longe.fase_nome
+        when classificacao.posicao is not null
+             then classificacao.posicao || 'º lugar'
+    end as resultado_final,
+
+    fase_mais_longe.fase_nome as fase_mais_avancada
+
 from agregado
 left join invencibilidade
        on invencibilidade.time_id   = agregado.time_id
       and invencibilidade.league_id = agregado.league_id
       and invencibilidade.season    = agregado.season
+left join sequencia_atual
+       on sequencia_atual.time_id   = agregado.time_id
+      and sequencia_atual.league_id = agregado.league_id
+      and sequencia_atual.season    = agregado.season
+left join fase_mais_longe
+       on fase_mais_longe.time_id   = agregado.time_id
+      and fase_mais_longe.league_id = agregado.league_id
+      and fase_mais_longe.season    = agregado.season
 left join {{ ref('gold_classificacao') }} as classificacao
        on classificacao.time_id   = agregado.time_id
       and classificacao.league_id = agregado.league_id

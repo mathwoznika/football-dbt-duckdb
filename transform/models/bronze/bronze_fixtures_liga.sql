@@ -35,5 +35,12 @@ select
     jogo.goals.away           as gols_fora,
     jogo.score.halftime.home  as gols_casa_1t,
     jogo.score.halftime.away  as gols_fora_1t,
+    -- placar da prorrogacao e dos penaltis. Vem nulo na esmagadora maioria dos
+    -- jogos, mas sem eles nao da para saber quem passou num confronto empatado
+    -- de mata-mata — e foi por isso que precisei voltar aqui.
+    try_cast(jogo.score.extratime.home as int) as gols_casa_prorrogacao,
+    try_cast(jogo.score.extratime.away as int) as gols_fora_prorrogacao,
+    try_cast(jogo.score.penalty.home as int)   as penaltis_casa,
+    try_cast(jogo.score.penalty.away as int)   as penaltis_fora,
     extraido_em
 from jogos
