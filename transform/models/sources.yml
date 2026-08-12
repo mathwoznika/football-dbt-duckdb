@@ -1,0 +1,18 @@
+version: 2
+
+sources:
+  - name: raw
+    meta:
+      external_location: "read_json('../data/raw/{name}/**/*.json', union_by_name := true, hive_partitioning := true)"
+    tables:
+      - name: fixtures
+      - name: fixtures_liga
+      - name: leagues
+      - name: teams
+      - name: standings
+      - name: coachs
+      - name: transfers
+      - name: fixture_statistics
+      - name: fixture_events
+      - name: fixture_lineups
+      - name: fixture_players

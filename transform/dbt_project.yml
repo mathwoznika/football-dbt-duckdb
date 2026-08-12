@@ -1,0 +1,11 @@
+name: coritiba
+profile: coritiba
+
+models:
+  coritiba:
+    bronze:
+      +materialized: table
+    silver:
+      +materialized: table
+    gold:
+      +materialized: table

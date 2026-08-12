@@ -1,0 +1,17 @@
+# ambiente
+env/
+.env
+__pycache__/
+*.pyc
+
+# artefatos de build
+*.duckdb
+*.duckdb.wal
+
+# gerado pelo dbt a cada run
+transform/target/
+transform/logs/
+transform/dbt_packages/
+
+# camada raw — ver nota no README sobre versionar ou nao
+data/
