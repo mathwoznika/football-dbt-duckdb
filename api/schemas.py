@@ -210,6 +210,12 @@ class JogadorEscalado(BaseModel):
     amarelos: int | None = None
     vermelhos: int | None = None
     entrou_do_banco: bool | None = None
+    saiu_no_minuto: int | None = Field(
+        default=None, description="Minuto em que foi substituido"
+    )
+    entrou_no_minuto: int | None = Field(
+        default=None, description="Minuto em que entrou em campo"
+    )
 
 
 class EstatisticaDaPartida(BaseModel):
@@ -270,6 +276,7 @@ class JogadorNaTemporada(BaseModel):
     league_nome: str | None = None
     posicao: str | None = None
     jogos_com_dado: int
+    jogos_com_minutos: int | None = None
     jogos_titular: int
     minutos: int | None = None
     nota_media: float | None = None
@@ -320,6 +327,177 @@ class AtuacaoDoJogador(BaseModel):
     duelos_ganhos: int | None = None
     amarelos: int | None = None
     vermelhos: int | None = None
+
+
+class Artilheiro(BaseModel):
+    """Uma linha da artilharia de uma competicao."""
+
+    posicao_artilharia: int
+    player_id: int
+    jogador: str
+    foto_url: str | None = None
+    idade: int | None = None
+    nacionalidade: str | None = None
+    posicao: str | None = None
+    team_id: int
+    team_nome: str
+    team_logo: str | None = None
+    jogos: int | None = None
+    minutos: int | None = None
+    gols: int
+    assistencias: int | None = None
+    gols_por_jogo: float | None = None
+    nota_media: float | None = None
+    teve_mais_de_um_clube: bool = Field(
+        default=False,
+        description="A fonte repete o bloco de numeros para quem trocou de "
+        "clube; nesses casos usamos o maximo, nao a soma.",
+    )
+
+
+class JogadorNaBase(BaseModel):
+    """Totais de um jogador NA NOSSA BASE — nao e estatistica de carreira.
+
+    A onda 3 cobre so jogos do Coritiba e o endpoint devolve os dois times,
+    entao jogador de adversario aparece com 1 ou 2 partidas. Use
+    jogos_com_dado para saber se a media ao lado significa alguma coisa.
+    """
+
+    player_id: int
+    jogador_nome: str
+    team_id: int | None = None
+    team_nome: str | None = None
+    clubes: int
+    posicao: str | None = None
+    primeira_temporada: int
+    ultima_temporada: int
+    temporadas: int
+    competicoes: int
+    jogos_com_dado: int = Field(
+        description="Vezes que foi relacionado, inclusive sem entrar em campo"
+    )
+    jogos_com_minutos: int = Field(description="Partidas em que de fato jogou")
+    jogos_titular: int | None = None
+    minutos: int | None = None
+    nota_media: float | None = None
+    melhor_nota: float | None = None
+    gols: int | None = None
+    assistencias: int | None = None
+    chutes: int | None = None
+    desarmes: int | None = None
+    duelos: int | None = None
+    duelos_ganhos: int | None = None
+    amarelos: int | None = None
+    vermelhos: int | None = None
+    defesas: int | None = None
+    gols_sofridos: int | None = None
+
+
+class DesempenhoPorTempo(BaseModel):
+    """Como o time se comporta em cada tempo, e o que faz com a vantagem."""
+
+    league_id: int
+    league_nome: str
+    season: int
+    jogos: int
+    gols_1t: int
+    gols_2t: int
+    sofridos_1t: int
+    sofridos_2t: int
+    saldo_1t: int
+    saldo_2t: int
+    pontos: int
+    pontos_se_acabasse_no_1t: int = Field(
+        description="Pontos que teria somado se todo jogo acabasse no intervalo"
+    )
+    diferenca_de_pontos: int = Field(
+        description="Negativo significa que o time perde pontos no segundo tempo"
+    )
+    intervalos_vencendo: int
+    intervalos_empatando: int
+    intervalos_perdendo: int
+    viradas: int = Field(description="Perdia no intervalo e venceu")
+    reacoes: int = Field(description="Perdia no intervalo e empatou")
+    vantagens_empatadas: int = Field(description="Vencia no intervalo e empatou")
+    vantagens_perdidas: int = Field(description="Vencia no intervalo e perdeu")
+
+
+class GolsPorPeriodo(BaseModel):
+    """Distribuicao dos gols por faixa de 15 minutos.
+
+    Cobertura PARCIAL: vem dos eventos, que so existem para os jogos ja
+    alcancados pela onda 3. jogos_com_evento diz sobre quantas partidas a
+    distribuicao foi calculada.
+    """
+
+    faixa: str
+    ordem_faixa: int
+    marcados: int
+    sofridos: int
+    jogos_com_evento: int
+
+
+class TecnicoDoTime(BaseModel):
+    """Aproveitamento sob um tecnico, derivado da escalacao de cada jogo."""
+
+    coach_id: int
+    tecnico: str
+    season: int
+    league_id: int
+    league_nome: str
+    jogos: int
+    vitorias: int
+    empates: int
+    derrotas: int
+    gols_pro: int
+    gols_contra: int
+    pontos: int
+    aproveitamento_pct: float
+    primeiro_jogo: date
+    ultimo_jogo: date
+
+
+class ArbitroDoTime(BaseModel):
+    """Retrospecto do time sob um arbitro.
+
+    ATENCAO A AMOSTRA: raramente passa de 9 jogos por arbitro. Diferenca de
+    aproveitamento nesse volume e ruido, nao padrao. Por isso cada linha traz o
+    baseline do proprio time ao lado — sem o contraponto, o numero isolado nao
+    significa nada.
+
+    Jogos e resultado cobrem toda a base (o arbitro vem no fixture). Faltas e
+    cartoes vem da onda 3 e cobrem so jogos_com_estatistica partidas.
+    """
+
+    arbitro: str
+    jogos: int
+    vitorias: int
+    empates: int
+    derrotas: int
+    gols_pro: int
+    gols_contra: int
+    pontos: int
+    aproveitamento_pct: float
+    aproveitamento_geral_pct: float = Field(
+        description="Aproveitamento do time em TODOS os jogos, para comparar"
+    )
+    diferenca_aproveitamento: float = Field(
+        description="Quanto foge da media do proprio time"
+    )
+    jogos_com_estatistica: int = Field(
+        description="Sobre quantos jogos as faltas e cartoes foram somados"
+    )
+    faltas_pro: int | None = None
+    faltas_contra: int | None = None
+    amarelos_pro: int | None = None
+    amarelos_contra: int | None = None
+    vermelhos_pro: int | None = None
+    vermelhos_contra: int | None = None
+    amarelos_por_jogo: float | None = None
+    amarelos_por_jogo_geral: float | None = None
+    diferenca_amarelos: float | None = None
+    primeiro_jogo: date
+    ultimo_jogo: date
 
 
 class LinhaClassificacao(BaseModel):

@@ -36,7 +36,20 @@ for f in ['apifootball.py','extrair.py','api/main.py','api/schemas.py','api/db.p
 
 # front — o build, nao o tsc solto (project references)
 cd web && npm run build; cd ..
+
+# seletor CSS duplicado — o build NAO pega isso, e ja quebrou a aplicacao
+# inteira uma vez (.cartao era painel e virou cartao de arbitragem)
+env/bin/python -c "
+import pathlib, re, collections
+s = pathlib.Path('web/src/index.css').read_text()
+sel = re.findall(r'^([.#a-zA-Z][^{\n]*?)\s*\{', s, re.M)
+d = [k for k,v in collections.Counter(x.strip() for x in sel).items() if v > 1]
+print('seletores duplicados:', d or 'nenhum')
+"
 ```
+
+CSS duplicado é sintaticamente válido: uma regra apenas sobrescreve a outra e
+nada acusa. Só uma busca por nome repetido encontra.
 
 Reporte também o estado da extração, que é o que define o dia seguinte:
 

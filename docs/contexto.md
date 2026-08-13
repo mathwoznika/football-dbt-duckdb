@@ -168,6 +168,28 @@ temporada inteira de todos independentemente de adversário. Ele **pagina** —
 algo como 30 páginas por liga-temporada, ~270 requisições para os 9 pares. São
 3 dias de cota Free, ou minutos no plano pago.
 
+**`fixture_players` inclui quem não entrou.** São 902 das 2.923 linhas: jogador
+relacionado que ficou no banco, com `minutos` nulo. Qualquer contagem de "jogos"
+precisa decidir se conta **relacionamento** ou **minutos em campo** — o Henrique
+foi relacionado 52 vezes e jogou 35. Por isso `gold_jogador` tem as duas
+colunas, e a nota média é ponderada por jogos com minutos.
+
+Consequência menos óbvia: `arg_max(team_id, minutos)` devolve **nulo** para quem
+nunca entrou, porque `arg_max` ignora linhas com a chave nula. Isso deixou 217
+de 880 jogadores sem clube e derrubou a listagem inteira na validação do
+Pydantic. Sempre `coalesce` na chave de ordenação do `arg_max`.
+
+**Artilharia repete os números de quem trocou de clube.** No `topscorers`, um
+jogador transferido vem com duas entradas no array `statistics` e a API **copia
+o mesmo bloco** sob os dois times. O Tiquinho Soares em 2023 aparece como
+Botafogo 33 jogos / 17 gols e Santos 32 jogos / 17 gols — ele não jogou no
+Santos naquele ano, e 33 + 32 seria impossível em 38 rodadas.
+
+Somar daria 34 gols a quem fez 17. A própria ranking da API o lista com 17, o
+que confirma que o total é o **máximo**, não a soma. O `gold_artilheiro`
+consolida com `max` e marca os afetados em `teve_mais_de_um_clube`. São 4 em
+176 — e o erro seria invisível, apareceria como um artilheiro inventado no topo.
+
 ## Concorrência: por que Postgres entra depois
 
 O DuckDB aceita **ou** um processo escrevendo **ou** vários lendo. Isso já
@@ -180,18 +202,13 @@ aninhados, e o DuckDB é ruim em servir leitura concorrente. Cada um onde é for
 
 ## Ordem planejada do que falta
 
-1. **Terminar a onda 3** — ~424 requisições, uns 4 dias. É o que mais entrega
+1. **Terminar a onda 3** — ~338 requisições, uns 3,5 dias. É o que mais entrega
    valor por requisição, então vem antes de qualquer extração nova.
-2. **Artilheiros** — as 9 tarefas já estão na fila do extrator; faltam o
-   `bronze_topscorers`, o `gold_artilheiro` e o painel abaixo da classificação.
-3. **Listagem de jogadores** com busca e filtro de amostra mínima. Barata, usa o
-   que já existe e completa a navegação — hoje só se chega num jogador a partir
-   de um jogo ou do elenco.
-4. **Análises pré-ML** que a base já sustenta: momento dos gols por faixa de 15
-   minutos, desempenho por tempo e viradas (esta funciona nos 1.746 jogos, sem
-   depender da onda 3), impacto do técnico, e por fim estatística contra
-   resultado — que é exploração de feature disfarçada de análise.
-5. **ML com MLflow** — `gold_features_partida` já tem 3.492 linhas prontas e
+2. **Estatística contra resultado** — a análise que falta do bloco pré-ML, e a
+   mais importante: posse prevê vitória? finalização no gol converte? É
+   exploração de feature disfarçada de análise, e o que sair dela vai para o
+   modelo.
+3. **ML com MLflow** — `gold_features_partida` já tem 3.492 linhas prontas e
    **não depende da onda 3**.
 6. **Postgres** como camada de serving, quando a aplicação for para o ar.
 7. **Dagster**, por último: ele resolve orquestração de várias etapas

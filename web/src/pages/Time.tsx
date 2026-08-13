@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import CaminhoNoTorneio from "../components/CaminhoNoTorneio";
 import Chaveamento from "../components/Chaveamento";
+import Artilheiros from "../components/Artilheiros";
 import Classificacao from "../components/Classificacao";
 import { useDados } from "../useDados";
 
@@ -48,6 +49,10 @@ export default function TimePage() {
   );
   const { dados: chaveamento } = useDados(
     () => (pronto ? api.chaveamento(leagueId!, season!) : Promise.resolve([])),
+    [season, leagueId],
+  );
+  const { dados: artilharia } = useDados(
+    () => (pronto ? api.artilheiros(leagueId!, season!, 10) : Promise.resolve([])),
     [season, leagueId],
   );
   const { dados: elenco } = useDados(
@@ -156,6 +161,9 @@ export default function TimePage() {
               {time?.fundacao ? ` · fundado em ${time.fundacao}` : ""}
             </div>
           </div>
+          <Link className="botao" to={`/times/${teamId}/analises`} style={{ marginLeft: "auto" }}>
+            Análises →
+          </Link>
         </div>
       </div>
 
@@ -268,6 +276,13 @@ export default function TimePage() {
                 ? "Tabela da fase de grupos."
                 : "P = pontos, J = jogos, SG = saldo de gols."}
             </p>
+
+            {(artilharia?.length ?? 0) > 0 && (
+              <>
+                <h2 style={{ marginTop: "1.4rem" }}>Artilharia</h2>
+                <Artilheiros lista={artilharia!} />
+              </>
+            )}
           </div>
         </div>
       ) : (

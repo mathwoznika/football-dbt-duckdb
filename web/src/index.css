@@ -355,14 +355,16 @@ tr.destacada td {
 /* ------------------------------------------------------- campo */
 
 /*
- * O campo e um retangulo com proporcao fixa; os jogadores sao posicionados por
- * porcentagem em cima dele. As marcacoes vem de um SVG esticado com
- * preserveAspectRatio="none", entao acompanham qualquer largura.
+ * O campo tem largura maxima porque duas colunas de 700px dariam 1000px de
+ * altura cada — nao cabe na tela. Com 380px de largura e proporcao 100/135,
+ * os dois campos ficam lado a lado e visiveis de uma vez.
  */
 .campo {
   position: relative;
-  aspect-ratio: 100 / 150;
+  aspect-ratio: 100 / 135;
   width: 100%;
+  max-width: 380px;
+  margin: 0 auto;
   background: color-mix(in srgb, var(--vitoria) 12%, var(--fundo-2));
   border-radius: 8px;
   overflow: hidden;
@@ -375,7 +377,7 @@ tr.destacada td {
   height: 100%;
   fill: none;
   stroke: color-mix(in srgb, var(--texto) 22%, transparent);
-  stroke-width: 0.6;
+  stroke-width: 0.5;
 }
 
 .campo-jogador {
@@ -385,24 +387,23 @@ tr.destacada td {
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  width: 74px;
+  width: 68px;
 }
 
 .camisa {
-  width: 30px;
-  height: 30px;
+  width: 25px;
+  height: 25px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   font-weight: 700;
   background: var(--fundo);
   border: 2px solid var(--texto-2);
   color: var(--texto);
 }
 
-/* a borda da camisa conta a nota da atuacao */
 .camisa.boa {
   border-color: var(--vitoria);
 }
@@ -414,7 +415,7 @@ tr.destacada td {
 }
 
 .campo-nome {
-  font-size: 0.66rem;
+  font-size: 0.6rem;
   text-align: center;
   line-height: 1.1;
   background: color-mix(in srgb, var(--fundo) 82%, transparent);
@@ -426,11 +427,46 @@ tr.destacada td {
   white-space: nowrap;
 }
 
-.campo-nota {
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: var(--texto-2);
+/* nota, cartao e minuto da substituicao, numa linha so */
+.campo-marcas {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.58rem;
   font-variant-numeric: tabular-nums;
+  color: var(--texto-2);
+}
+
+.campo-nota {
+  font-weight: 700;
+}
+
+.campo-marcas .saiu {
+  color: var(--derrota);
+  font-weight: 700;
+}
+
+/*
+ * Cartao de arbitragem, desenhado com CSS em vez de emoji — fica nitido em
+ * qualquer tamanho e acompanha a paleta do tema.
+ *
+ * O nome NAO pode ser .cartao: essa classe ja e o painel da interface, usada
+ * em toda tela. Como esta regra viria depois no arquivo, ela sobrescreveria a
+ * outra e deixaria todo painel do app com 6px de largura.
+ */
+.marca-cartao {
+  display: inline-block;
+  width: 6px;
+  height: 8px;
+  border-radius: 1px;
+}
+
+.marca-cartao.amarelo {
+  background: var(--empate);
+}
+
+.marca-cartao.vermelho {
+  background: var(--derrota);
 }
 
 .campo-link {
@@ -783,4 +819,89 @@ tr.destacada td {
 
 .timeline-nota {
   font-size: 0.74rem;
+}
+
+/* ------------------------------------------ momento dos gols */
+
+.periodos {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.6rem;
+  align-items: end;
+  height: 190px;
+  margin-bottom: 0.8rem;
+}
+
+.periodo {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+/* as duas barras dividem a largura da faixa; a altura e proporcional ao maximo */
+.periodo-barras {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.barra {
+  width: 26px;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+}
+
+.barra.marcados,
+.legenda.marcados {
+  background: var(--vitoria);
+}
+
+.barra.sofridos,
+.legenda.sofridos {
+  background: var(--derrota);
+}
+
+.periodo-rotulo {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--texto-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.periodo-numeros {
+  text-align: center;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.periodo-numeros .marcados {
+  color: var(--vitoria);
+  font-weight: 700;
+}
+
+.periodo-numeros .sofridos {
+  color: var(--derrota);
+  font-weight: 700;
+}
+
+.legenda {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 2px;
+}
+
+/* aviso de leitura: usado onde o numero engana se lido sem contexto */
+.aviso {
+  border-left: 3px solid var(--empate);
+  background: color-mix(in srgb, var(--empate) 10%, transparent);
+  padding: 0.7rem 0.9rem;
+  border-radius: 0 8px 8px 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
 }

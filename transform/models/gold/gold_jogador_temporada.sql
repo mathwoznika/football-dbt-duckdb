@@ -26,7 +26,12 @@ select
     league_id,
     any_value(league_nome) as league_nome,
 
+    -- CUIDADO com a diferenca: o endpoint lista todo mundo que foi
+    -- relacionado, inclusive quem ficou no banco sem entrar. Sao 902 das 2.923
+    -- linhas da base. jogos_com_dado conta relacionamentos; jogos_com_minutos
+    -- conta quem de fato pisou em campo.
     count(*)                                                as jogos_com_dado,
+    count(*) filter (where minutos is not null)             as jogos_com_minutos,
     sum(case when entrou_do_banco then 0 else 1 end)        as jogos_titular,
     sum(minutos)                                            as minutos,
     round(avg(nota), 2)                                     as nota_media,

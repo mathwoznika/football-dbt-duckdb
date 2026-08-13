@@ -132,6 +132,8 @@ export type JogadorEscalado = {
   amarelos: number | null;
   vermelhos: number | null;
   entrou_do_banco: boolean | null;
+  saiu_no_minuto: number | null;
+  entrou_no_minuto: number | null;
 };
 
 export type EstatisticaDaPartida = {
@@ -183,6 +185,7 @@ export type JogadorNaTemporada = {
   league_nome: string | null;
   posicao: string | null;
   jogos_com_dado: number;
+  jogos_com_minutos: number | null;
   jogos_titular: number;
   minutos: number | null;
   nota_media: number | null;
@@ -231,6 +234,138 @@ export type AtuacaoDoJogador = {
   duelos_ganhos: number | null;
   amarelos: number | null;
   vermelhos: number | null;
+};
+
+export type Artilheiro = {
+  posicao_artilharia: number;
+  player_id: number;
+  jogador: string;
+  foto_url: string | null;
+  idade: number | null;
+  nacionalidade: string | null;
+  posicao: string | null;
+  team_id: number;
+  team_nome: string;
+  team_logo: string | null;
+  jogos: number | null;
+  minutos: number | null;
+  gols: number;
+  assistencias: number | null;
+  gols_por_jogo: number | null;
+  nota_media: number | null;
+  /** A fonte repete os numeros de quem trocou de clube; usamos o maximo. */
+  teve_mais_de_um_clube: boolean;
+};
+
+export type JogadorNaBase = {
+  player_id: number;
+  jogador_nome: string;
+  team_id: number | null;
+  team_nome: string | null;
+  clubes: number;
+  posicao: string | null;
+  primeira_temporada: number;
+  ultima_temporada: number;
+  temporadas: number;
+  competicoes: number;
+  /** Vezes que foi RELACIONADO, inclusive sem entrar em campo. */
+  jogos_com_dado: number;
+  /** Partidas em que de fato jogou. E este que qualifica a media. */
+  jogos_com_minutos: number;
+  jogos_titular: number | null;
+  minutos: number | null;
+  nota_media: number | null;
+  melhor_nota: number | null;
+  gols: number | null;
+  assistencias: number | null;
+  chutes: number | null;
+  desarmes: number | null;
+  duelos: number | null;
+  duelos_ganhos: number | null;
+  amarelos: number | null;
+  vermelhos: number | null;
+  defesas: number | null;
+  gols_sofridos: number | null;
+};
+
+export type DesempenhoPorTempo = {
+  league_id: number;
+  league_nome: string;
+  season: number;
+  jogos: number;
+  gols_1t: number;
+  gols_2t: number;
+  sofridos_1t: number;
+  sofridos_2t: number;
+  saldo_1t: number;
+  saldo_2t: number;
+  pontos: number;
+  /** Pontos que teria somado se todo jogo acabasse no intervalo. */
+  pontos_se_acabasse_no_1t: number;
+  /** Negativo = o time perde pontos no segundo tempo. */
+  diferenca_de_pontos: number;
+  intervalos_vencendo: number;
+  intervalos_empatando: number;
+  intervalos_perdendo: number;
+  viradas: number;
+  reacoes: number;
+  vantagens_empatadas: number;
+  vantagens_perdidas: number;
+};
+
+export type GolsPorPeriodo = {
+  faixa: string;
+  ordem_faixa: number;
+  marcados: number;
+  sofridos: number;
+  /** Cobertura parcial: sobre quantos jogos a distribuicao foi calculada. */
+  jogos_com_evento: number;
+};
+
+export type TecnicoDoTime = {
+  coach_id: number;
+  tecnico: string;
+  season: number;
+  league_id: number;
+  league_nome: string;
+  jogos: number;
+  vitorias: number;
+  empates: number;
+  derrotas: number;
+  gols_pro: number;
+  gols_contra: number;
+  pontos: number;
+  aproveitamento_pct: number;
+  primeiro_jogo: string;
+  ultimo_jogo: string;
+};
+
+export type ArbitroDoTime = {
+  arbitro: string;
+  jogos: number;
+  vitorias: number;
+  empates: number;
+  derrotas: number;
+  gols_pro: number;
+  gols_contra: number;
+  pontos: number;
+  aproveitamento_pct: number;
+  /** Aproveitamento do time em TODOS os jogos, para servir de contraponto. */
+  aproveitamento_geral_pct: number;
+  diferenca_aproveitamento: number;
+  /** Sobre quantos jogos faltas e cartoes foram somados (cobertura da onda 3). */
+  jogos_com_estatistica: number;
+  faltas_pro: number | null;
+  faltas_contra: number | null;
+  amarelos_pro: number | null;
+  amarelos_contra: number | null;
+  vermelhos_pro: number | null;
+  vermelhos_contra: number | null;
+  amarelos_por_jogo: number | null;
+  amarelos_por_jogo_geral: number | null;
+  diferenca_amarelos: number | null;
+  primeiro_jogo: string;
+  ultimo_jogo: string;
 };
 
 export type LinhaClassificacao = {
@@ -370,4 +505,27 @@ export const api = {
 
   jogosDoJogador: (player_id: number, season?: number, league_id?: number) =>
     get<AtuacaoDoJogador[]>(`/jogadores/${player_id}/jogos${query({ season, league_id })}`),
+
+  jogadores: (busca?: string, min_jogos = 5) =>
+    get<JogadorNaBase[]>(
+      `/jogadores${query({ busca: busca && busca.length >= 2 ? busca : undefined, min_jogos, limite: 100 })}`,
+    ),
+
+  desempenhoPorTempo: (team_id: number) =>
+    get<DesempenhoPorTempo[]>(`/times/${team_id}/desempenho-por-tempo`),
+
+  golsPorPeriodo: (team_id: number, season?: number, league_id?: number) =>
+    get<GolsPorPeriodo[]>(
+      `/times/${team_id}/gols-por-periodo${query({ season, league_id })}`,
+    ),
+
+  arbitragem: (team_id: number, min_jogos = 3) =>
+    get<ArbitroDoTime[]>(`/times/${team_id}/arbitragem${query({ min_jogos })}`),
+
+  tecnicos: (team_id: number) => get<TecnicoDoTime[]>(`/times/${team_id}/tecnicos`),
+
+  artilheiros: (league_id: number, season: number, limite = 10) =>
+    get<Artilheiro[]>(
+      `/competicoes/${league_id}/temporadas/${season}/artilheiros${query({ limite })}`,
+    ),
 };

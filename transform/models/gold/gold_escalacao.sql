@@ -25,6 +25,49 @@ atuacoes as (
 
 ),
 
+-- Quem saiu e quem entrou, e em que minuto. Sai dos eventos porque a
+-- escalacao sozinha nao conta isso: ela diz quem era titular e quem era
+-- reserva, nao o que aconteceu durante o jogo.
+--
+-- Reaproveita a convencao ja resolvida no gold_partida_evento: em substituicao
+-- o `jogador` e quem SAI e o `relacionado` e quem ENTRA — o inverso do que os
+-- nomes da API sugerem.
+substituicoes as (
+
+    select
+        fixture_id,
+        jogador_id as player_id,
+        min(minuto) as saiu_no_minuto,
+        null::int   as entrou_no_minuto
+    from {{ ref('gold_partida_evento') }}
+    where tipo = 'subst' and jogador_id is not null
+    group by all
+
+    union all
+
+    select
+        fixture_id,
+        relacionado_id as player_id,
+        null::int      as saiu_no_minuto,
+        min(minuto)    as entrou_no_minuto
+    from {{ ref('gold_partida_evento') }}
+    where tipo = 'subst' and relacionado_id is not null
+    group by all
+
+),
+
+movimentacao as (
+
+    select
+        fixture_id,
+        player_id,
+        max(saiu_no_minuto)   as saiu_no_minuto,
+        max(entrou_no_minuto) as entrou_no_minuto
+    from substituicoes
+    group by all
+
+),
+
 posicionados as (
 
     select
@@ -71,9 +114,15 @@ select
     atuacoes.duelos_ganhos,
     atuacoes.amarelos,
     atuacoes.vermelhos,
-    atuacoes.entrou_do_banco
+    atuacoes.entrou_do_banco,
+
+    movimentacao.saiu_no_minuto,
+    movimentacao.entrou_no_minuto
 
 from posicionados
 left join atuacoes
        on atuacoes.fixture_id = posicionados.fixture_id
       and atuacoes.player_id  = posicionados.player_id
+left join movimentacao
+       on movimentacao.fixture_id = posicionados.fixture_id
+      and movimentacao.player_id  = posicionados.player_id

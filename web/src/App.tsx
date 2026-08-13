@@ -1,6 +1,8 @@
 import { Link, Route, Routes } from "react-router-dom";
 
+import Jogadores from "./pages/Jogadores";
 import Times from "./pages/Times";
+import Analises from "./pages/Analises";
 import JogadorPage from "./pages/Jogador";
 import JogoPage from "./pages/Jogo";
 import TimePage from "./pages/Time";
@@ -22,13 +24,17 @@ export default function App() {
         <Link to="/">
           <strong>Futebol Brasileiro</strong>
         </Link>{" "}
+        <Link to="/">Times</Link>{" · "}
+        <Link to="/jogadores">Jogadores</Link>{" "}
         <span className="discreto">· Série A, Série B, Copa do Brasil e Paranaense</span>
       </header>
 
       <main className="conteudo">
         <Routes>
           <Route path="/" element={<Times />} />
+          <Route path="/jogadores" element={<Jogadores />} />
           <Route path="/times/:id" element={<TimePage />} />
+          <Route path="/times/:id/analises" element={<Analises />} />
           <Route path="/jogos/:fixtureId" element={<JogoPage />} />
           <Route path="/jogadores/:playerId" element={<JogadorPage />} />
           <Route path="*" element={<p>Página não encontrada.</p>} />

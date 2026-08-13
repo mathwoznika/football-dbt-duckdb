@@ -119,6 +119,58 @@ models:
       - name: player_id
         tests: [not_null]
 
+  - name: gold_artilheiro
+    description: >
+      Artilharia oficial de cada competicao e temporada, uma linha por jogador.
+
+      Consolida uma duplicidade da fonte: jogador que trocou de clube vem com
+      duas entradas e a API REPETE o mesmo bloco de numeros sob os dois times.
+      Por isso as metricas usam max e nao sum — somar daria 34 gols a quem fez
+      17. A coluna teve_mais_de_um_clube marca os casos afetados.
+
+      Vem do endpoint /players/topscorers e nao dos eventos, porque a onda 3 so
+      cobre jogos do Coritiba e nao veria gol de Palmeiras x Flamengo.
+    columns:
+      - name: player_id
+        tests: [not_null]
+      - name: gols
+        tests: [not_null]
+      - name: posicao_artilharia
+        tests: [not_null]
+
+  - name: gold_desempenho_por_tempo
+    description: >
+      Primeiro contra segundo tempo, e o que o time faz com a vantagem.
+
+      Nao depende da onda 3: o placar do intervalo vem no proprio fixture,
+      entao cobre os 1.746 jogos da base e nao apenas os detalhados.
+
+      A coluna pontos_se_acabasse_no_1t responde uma pergunta que a tabela nao
+      responde — o time ganha ou perde campeonato no segundo tempo. O Coritiba
+      na Serie A 2023 fez 30 pontos e teria feito 42; foi o que mais perdeu
+      pontos em segundos tempos naquele campeonato.
+    columns:
+      - name: time_id
+        tests: [not_null]
+      - name: jogos
+        tests: [not_null]
+      - name: pontos_se_acabasse_no_1t
+        tests: [not_null]
+
+  - name: gold_gols_por_periodo
+    description: >
+      Distribuicao dos gols marcados e sofridos por faixa de 15 minutos.
+
+      COBERTURA PARCIAL: vem dos eventos, que so existem para os jogos ja
+      alcancados pela onda 3. A coluna jogos_com_evento diz sobre quantas
+      partidas a distribuicao foi calculada — sem ela, comparar temporadas com
+      coberturas diferentes leva a conclusao errada.
+    columns:
+      - name: time_id
+        tests: [not_null]
+      - name: ordem_faixa
+        tests: [not_null]
+
   - name: gold_confronto_eliminatorio
     description: >
       Chaveamento do mata-mata. Grao: um CONFRONTO, nao uma partida — os dois

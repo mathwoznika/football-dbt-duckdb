@@ -15,7 +15,7 @@ apifootball.py     cliente da API-Football: HTTP, rate limit, gravação do raw
 extrair.py         o que extrair (ligas, temporadas, escopo). É o arquivo editado
 data/raw/          JSON cru, imutável, um arquivo por resposta da API
 data/warehouse.duckdb   banco de trabalho do dbt
-transform/         projeto dbt (28 models, 4 testes singulares)
+transform/         projeto dbt (33 models, 5 testes singulares)
 api/               nossa API (FastAPI) — não confundir com apifootball.py
 web/               front (Vite + React + TypeScript)
 docs/contexto.md   por que cada decisão foi tomada
@@ -88,6 +88,21 @@ O extrator é idempotente: o que já está em `data/raw` é pulado sem gastar na
 
 **`_meta.params` é essencial.** Os endpoints por jogo não devolvem o
 `fixture_id` no corpo — ele só existe nos parâmetros que gravamos.
+
+**Nomes sobrecarregados em português.** `cartao` já é o painel da interface no
+CSS — usar a mesma classe para cartão de arbitragem colapsou todos os painéis
+do app para 6px. Antes de criar uma classe, verifique se o nome já existe:
+
+```bash
+env/bin/python -c "
+import pathlib, re, collections
+s = pathlib.Path('web/src/index.css').read_text()
+sel = re.findall(r'^([.#a-zA-Z][^{\n]*?)\s*\{', s, re.M)
+print([k for k,v in collections.Counter(x.strip() for x in sel).items() if v > 1] or 'nenhum')
+"
+```
+
+O mesmo cuidado vale para `time` (equipe vs. tempo) e `partida` (jogo vs. início).
 
 ## Skills
 

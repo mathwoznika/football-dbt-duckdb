@@ -14,16 +14,22 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.db import consultar
 from api.schemas import (
+    Artilheiro,
+    ArbitroDoTime,
     AtuacaoDoJogador,
     Confronto,
     ConfrontoEliminatorio,
+    DesempenhoPorTempo,
     EstatisticaDaPartida,
     EventoDaPartida,
+    GolsPorPeriodo,
     JogadorEscalado,
+    JogadorNaBase,
     JogadorNaTemporada,
     JogoDaCampanha,
     LinhaClassificacao,
     Partida,
+    TecnicoDoTime,
     TemporadaDoTime,
     Time,
 )
@@ -157,6 +163,98 @@ def confrontos_do_time(
     )
 
 
+# ------------------------------------------------------------- analises
+
+
+@app.get("/times/{team_id}/desempenho-por-tempo", response_model=list[DesempenhoPorTempo])
+def desempenho_por_tempo(team_id: int):
+    """Primeiro contra segundo tempo, e o que o time fez com a vantagem.
+
+    Cobre todos os jogos da base: o placar do intervalo vem no proprio fixture
+    e nao depende da extracao por partida.
+    """
+    return consultar(
+        """
+        select league_id, league_nome, season, jogos, gols_1t, gols_2t,
+               sofridos_1t, sofridos_2t, saldo_1t, saldo_2t, pontos,
+               pontos_se_acabasse_no_1t, diferenca_de_pontos,
+               intervalos_vencendo, intervalos_empatando, intervalos_perdendo,
+               viradas, reacoes, vantagens_empatadas, vantagens_perdidas
+        from gold_desempenho_por_tempo
+        where time_id = ?
+        order by season desc, jogos desc
+        """,
+        [team_id],
+    )
+
+
+@app.get("/times/{team_id}/gols-por-periodo", response_model=list[GolsPorPeriodo])
+def gols_por_periodo(
+    team_id: int,
+    season: int | None = Query(default=None),
+    league_id: int | None = Query(default=None),
+):
+    """Em que faixa de 15 minutos o time marca e sofre. Cobertura parcial."""
+    return consultar(
+        """
+        select faixa, ordem_faixa, marcados, sofridos, jogos_com_evento
+        from gold_gols_por_periodo
+        where time_id = ?
+          and (? is null or season = ?)
+          and (? is null or league_id = ?)
+        order by ordem_faixa
+        """,
+        [team_id, season, season, league_id, league_id],
+    )
+
+
+@app.get("/times/{team_id}/tecnicos", response_model=list[TecnicoDoTime])
+def tecnicos_do_time(team_id: int):
+    """Aproveitamento sob cada tecnico. Cobre so jogos com escalacao extraida."""
+    return consultar(
+        """
+        select coach_id, tecnico, season, league_id, league_nome, jogos,
+               vitorias, empates, derrotas, gols_pro, gols_contra, pontos,
+               aproveitamento_pct, primeiro_jogo, ultimo_jogo
+        from gold_tecnico_desempenho
+        where time_id = ?
+        order by season desc, jogos desc
+        """,
+        [team_id],
+    )
+
+
+@app.get("/times/{team_id}/arbitragem", response_model=list[ArbitroDoTime])
+def arbitragem(
+    team_id: int,
+    min_jogos: int = Query(
+        default=3,
+        ge=1,
+        description="Amostra minima. Mesmo no maximo (9 jogos) o numero e ruidoso.",
+    ),
+):
+    """Retrospecto do time sob cada arbitro, com o baseline do time ao lado.
+
+    O baseline nao e decoracao: com 5 a 9 jogos por arbitro, o aproveitamento
+    isolado nao diz nada. Comparado com a media do proprio time, pelo menos
+    vira uma frase honesta — e ainda assim e ruido, nao padrao.
+    """
+    return consultar(
+        """
+        select arbitro, jogos, vitorias, empates, derrotas, gols_pro,
+               gols_contra, pontos, aproveitamento_pct, aproveitamento_geral_pct,
+               diferenca_aproveitamento, jogos_com_estatistica, faltas_pro,
+               faltas_contra, amarelos_pro, amarelos_contra, vermelhos_pro,
+               vermelhos_contra, amarelos_por_jogo, amarelos_por_jogo_geral,
+               diferenca_amarelos, primeiro_jogo, ultimo_jogo
+        from gold_arbitragem
+        where time_id = ? and jogos >= ?
+        order by jogos desc, aproveitamento_pct desc
+        """,
+        [team_id, min_jogos],
+    )
+
+
 # ---------------------------------------------------------------- jogos
 
 
@@ -195,7 +293,7 @@ def escalacoes(fixture_id: int):
                linha, coluna, jogadores_na_linha, linhas_no_time,
                minutos, nota, gols, assistencias, chutes, chutes_no_gol,
                passes, desarmes, duelos, duelos_ganhos, amarelos, vermelhos,
-               entrou_do_banco
+               entrou_do_banco, saiu_no_minuto, entrou_no_minuto
         from gold_escalacao
         where fixture_id = ?
         order by team_id, titular desc, linha, coluna, camisa
@@ -241,6 +339,41 @@ def eventos_da_partida(fixture_id: int):
 # ------------------------------------------------------------ jogadores
 
 
+@app.get("/jogadores", response_model=list[JogadorNaBase])
+def listar_jogadores(
+    busca: str | None = Query(default=None, min_length=2),
+    min_jogos: int = Query(
+        default=5,
+        ge=1,
+        description="Amostra minima. O padrao e 5 porque a base tem centenas "
+        "de jogadores de adversarios com uma unica partida.",
+    ),
+    limite: int = Query(default=50, ge=1, le=200),
+):
+    """Jogadores presentes na base, com os totais que existem aqui.
+
+    NAO e estatistica de carreira: a onda 3 cobre so jogos do Coritiba e o
+    endpoint da API devolve os dois times, entao jogador de adversario aparece
+    com 1 ou 2 partidas.
+    """
+    return consultar(
+        """
+        select player_id, jogador_nome, team_id, team_nome, clubes, posicao,
+               primeira_temporada, ultima_temporada, temporadas, competicoes,
+               jogos_com_dado, jogos_com_minutos, jogos_titular, minutos,
+               nota_media, melhor_nota,
+               gols, assistencias, chutes, desarmes, duelos, duelos_ganhos,
+               amarelos, vermelhos, defesas, gols_sofridos
+        from gold_jogador
+        where jogos_com_dado >= ?
+          and (? is null or lower(jogador_nome) like lower('%' || ? || '%'))
+        order by minutos desc nulls last
+        limit ?
+        """,
+        [min_jogos, busca, busca, limite],
+    )
+
+
 @app.get("/times/{team_id}/elenco", response_model=list[JogadorNaTemporada])
 def elenco(
     team_id: int,
@@ -251,7 +384,8 @@ def elenco(
     return consultar(
         """
         select player_id, jogador_nome, team_id, team_nome, season, league_id,
-               league_nome, posicao, jogos_com_dado, jogos_titular, minutos, nota_media,
+               league_nome, posicao, jogos_com_dado, jogos_com_minutos,
+               jogos_titular, minutos, nota_media,
                melhor_nota, gols, assistencias, chutes, chutes_no_gol, passes,
                desarmes, duelos, duelos_ganhos, dribles_tentados,
                dribles_certos, faltas_cometidas, amarelos, vermelhos,
@@ -272,7 +406,8 @@ def temporadas_do_jogador(player_id: int):
     linhas = consultar(
         """
         select player_id, jogador_nome, team_id, team_nome, season, league_id,
-               league_nome, posicao, jogos_com_dado, jogos_titular, minutos, nota_media,
+               league_nome, posicao, jogos_com_dado, jogos_com_minutos,
+               jogos_titular, minutos, nota_media,
                melhor_nota, gols, assistencias, chutes, chutes_no_gol, passes,
                desarmes, duelos, duelos_ganhos, dribles_tentados,
                dribles_certos, faltas_cometidas, amarelos, vermelhos,
@@ -309,6 +444,27 @@ def jogos_do_jogador(
         order by data
         """,
         [player_id, season, season, league_id, league_id],
+    )
+
+
+@app.get(
+    "/competicoes/{league_id}/temporadas/{season}/artilheiros",
+    response_model=list[Artilheiro],
+)
+def artilheiros(league_id: int, season: int, limite: int = Query(default=10, ge=1, le=50)):
+    """Artilharia oficial da competicao, vinda do endpoint de topscorers."""
+    return consultar(
+        """
+        select posicao_artilharia, player_id, jogador, foto_url, idade,
+               nacionalidade, posicao, team_id, team_nome, team_logo, jogos,
+               minutos, gols, assistencias, gols_por_jogo, nota_media,
+               teve_mais_de_um_clube
+        from gold_artilheiro
+        where league_id = ? and season = ?
+        order by posicao_artilharia
+        limit ?
+        """,
+        [league_id, season, limite],
     )
 
 
