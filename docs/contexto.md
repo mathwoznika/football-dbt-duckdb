@@ -200,16 +200,83 @@ para o ar e o pipeline rodar junto, a saída é separar papéis: DuckDB transfor
 Postgres serve. Não é redundância — o Postgres é ruim em ler 770 JSONs
 aninhados, e o DuckDB é ruim em servir leitura concorrente. Cada um onde é forte.
 
+**Transferências duplicam e misturam dois campos.** O mesmo jogador com o mesmo
+destino aparece em dias consecutivos — 55 linhas de 1.020 — porque a API
+reprocessa e regrava; ficamos com a data mais antiga. E o campo `type` guarda a
+modalidade (`Loan`, `Free`) **e o valor** (`€ 1.5M`, `€ 500K`) no mesmo lugar,
+separados no gold em `tipo` e `valor_eur`.
+
+Detalhe que confunde na tela: as transferências vão até **julho de 2026**,
+enquanto os jogos param em 2024 por limitação do plano. É o único dado do
+projeto que alcança o presente, e a seção avisa isso em texto.
+
+## ML: o que foi tentado e por que parou
+
+O `ml/treinar.py` treina um classificador de resultado (V/E/D) sobre o
+`gold_features_partida` e registra tudo no MLflow. O resultado, com o split
+temporal 2022-2023 → 2024:
+
+```
+baseline "mandante vence"    0,517
+regressao logistica          0,517    empatou
+gradient boosting            0,461    ficou abaixo
+```
+
+**Duas coisas estavam erradas, e sao independentes.**
+
+A primeira foi minha: aquele split treina 72% em Serie A e testa 72% em Serie B
+— ligas diferentes, e 25 dos 106 times do teste nunca aparecem no treino. A
+avaliacao era ininterpretavel.
+
+A segunda sobrevive a correcao. Com recorte limpo (so Serie A, treina 2022,
+testa 2023) o baseline faz 0,462 e a logistica 0,470 — oito milesimos em 370
+partidas, ou seja ruido. **As features nao carregam sinal alem do mando.**
+
+O gargalo e volume: 740 linhas de treino sao 370 partidas. O plano Pro libera
+2015 em diante, o que daria ~4.500 partidas so de Serie A — uma ordem de
+grandeza a mais. Somado as features de estatistica da onda 3, ai existe
+experimento de verdade.
+
+Ate la, o script fica como o que ele e: o experimento que estabeleceu o baseline
+e mostrou que as features atuais nao o superam. Num portfolio isso vale mais que
+um numero inflado por vazamento.
+
+Detalhe metodologico que vale manter: o script **quebra** se aparecer NaN nas
+features, em vez de imputar. Preencher com a mediana em silencio esconderia
+mudanca no mart.
+
+## Lições de visualização
+
+Duas correções que valem para os próximos gráficos.
+
+**O gráfico de evolução com as 20 linhas iguais era ilegível.** Num campeonato
+de 20 times as trajetórias se cruzam a cada rodada e o resultado é emaranhado.
+A correção não foi de estilo, foi de **recorte**: mostrar uma história por vez,
+com a linha escolhida em destaque e as outras como fundo apagado.
+
+**E ele era alto demais.** Um viewBox quase quadrado esticado até os 1500px do
+container vira um bloco de 700px de altura para mostrar uma curva. Gráfico de
+linha quer viewBox largo e baixo mais um teto de largura — e a sobra à direita
+é lugar para resumo, não para vazio.
+
+**Vocabulário:** os rótulos dizem "4 primeiros" e "4 últimos", não "G4" e "zona
+de rebaixamento". Quem classifica e quem cai muda por competição e por ano; o
+Paranaense tem 12 times e outro formato. Rótulo descritivo funciona em qualquer
+competição sem afirmar regra que o dado não carrega. Mesma disciplina do aviso
+na tela de arbitragem.
+
 ## Ordem planejada do que falta
 
 1. **Terminar a onda 3** — ~338 requisições, uns 3,5 dias. É o que mais entrega
-   valor por requisição, então vem antes de qualquer extração nova.
-2. **Estatística contra resultado** — a análise que falta do bloco pré-ML, e a
-   mais importante: posse prevê vitória? finalização no gol converte? É
-   exploração de feature disfarçada de análise, e o que sair dela vai para o
-   modelo.
-3. **ML com MLflow** — `gold_features_partida` já tem 3.492 linhas prontas e
-   **não depende da onda 3**.
+   valor por requisição, então vem antes de qualquer extração nova. Quando
+   fechar, as telas que hoje mostram cobertura parcial (momento dos gols,
+   estatística de jogo, elenco) se completam sozinhas.
+2. **Dagster** — deixou de ser cerimônia: há três etapas com dependência e
+   ritmos diferentes (extração diária, dbt depois dela, treino sob demanda). E
+   automatiza o `python extrair.py` que hoje é rodado à mão todo dia.
+3. **Postgres e docker-compose** — tirar a aplicação do "roda na minha máquina".
+4. **Retomar o ML** quando houver volume: plano Pro (2015+) e/ou onda 3
+   completa para as features de estatística.
 6. **Postgres** como camada de serving, quando a aplicação for para o ar.
 7. **Dagster**, por último: ele resolve orquestração de várias etapas
    interdependentes, e orquestrar duas coisas rodadas à mão é cerimônia.

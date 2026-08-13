@@ -15,9 +15,10 @@ apifootball.py     cliente da API-Football: HTTP, rate limit, gravação do raw
 extrair.py         o que extrair (ligas, temporadas, escopo). É o arquivo editado
 data/raw/          JSON cru, imutável, um arquivo por resposta da API
 data/warehouse.duckdb   banco de trabalho do dbt
-transform/         projeto dbt (33 models, 5 testes singulares)
+transform/         projeto dbt (35 models, 6 testes singulares)
 api/               nossa API (FastAPI) — não confundir com apifootball.py
-web/               front (Vite + React + TypeScript)
+web/               front (Vite + React + TypeScript, 8 páginas)
+ml/treinar.py      experimento de previsão — PAUSADO, sem consumidor
 docs/contexto.md   por que cada decisão foi tomada
 .claude/skills/    fluxos repetíveis (novo-dataset, fechar-dia)
 ```
@@ -103,6 +104,24 @@ print([k for k,v in collections.Counter(x.strip() for x in sel).items() if v > 1
 ```
 
 O mesmo cuidado vale para `time` (equipe vs. tempo) e `partida` (jogo vs. início).
+
+## Onde o projeto está
+
+**Extração:** onda 3 em 83 de 168 jogos, ~338 tarefas pendentes, uns 3,5 dias a
+95 requisições/dia. Rodar `env/bin/python extrair.py` uma vez por dia até zerar.
+Tudo o mais (calendários, ligas, times, classificações, artilheiros, técnicos,
+transferências) já está extraído.
+
+**Pronto e no ar:** 35 models, 23 endpoints, 8 páginas — times, jogadores,
+jogo com campinho posicionado, competições com classificação/artilharia/
+chaveamento/evolução, e análises (1º x 2º tempo, momento dos gols, técnicos,
+arbitragem).
+
+**ML pausado**, e não por falta de esforço: ver a seção correspondente no
+`docs/contexto.md` antes de retomar.
+
+**Próximo bloco:** Dagster, depois Postgres com docker-compose. O raciocínio
+está no fim do `contexto.md`.
 
 ## Skills
 

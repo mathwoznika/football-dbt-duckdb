@@ -905,3 +905,100 @@ tr.destacada td {
   font-size: 0.88rem;
   line-height: 1.45;
 }
+
+/* ------------------------------------- evolucao na classificacao */
+
+/*
+ * Teto de largura: o grafico e uma linha, nao um painel. Sem isso ele estica
+ * ate os 1500px do container e, como a altura acompanha a proporcao do
+ * viewBox, virava um bloco de 700px de altura para mostrar uma curva.
+ */
+.evolucao {
+  max-width: 100%;
+}
+
+/*
+ * Grafico a esquerda com teto de 720px, resumo a direita ocupando a sobra.
+ * Antes o cartao ia ate os 1500px do container e o grafico parava nos 720,
+ * deixando metade da largura vazia.
+ */
+.evolucao-corpo {
+  display: grid;
+  grid-template-columns: minmax(0, 720px) minmax(220px, 1fr);
+  gap: 1.5rem;
+  align-items: center;
+}
+
+@media (max-width: 1000px) {
+  .evolucao-corpo {
+    grid-template-columns: 1fr;
+  }
+}
+
+.evolucao-resumo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.evolucao-linha {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.28rem 0;
+  border-bottom: 1px solid var(--borda);
+  font-size: 0.86rem;
+}
+
+.evolucao-linha:last-child {
+  border-bottom: none;
+}
+
+.evolucao-linha strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.evolucao-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* apenas duas referencias horizontais, bem discretas */
+.evolucao-svg .grade {
+  stroke: var(--borda);
+  stroke-width: 0.3;
+}
+
+.evolucao-svg .eixo {
+  fill: var(--texto-2);
+  font-size: 4.5px;
+}
+
+.evolucao-svg .serie {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* as nao escolhidas dao contexto sem competir pela leitura */
+.evolucao-svg .serie.fundo {
+  stroke: color-mix(in srgb, var(--texto-2) 14%, transparent);
+  stroke-width: 0.5;
+}
+
+.evolucao-svg .serie.focada {
+  stroke: var(--destaque);
+  stroke-width: 1.4;
+}
+
+.evolucao-svg .ponta {
+  fill: var(--destaque);
+}
+
+/* seletor menor, para nao dominar um grafico pequeno */
+select.compacto {
+  font-size: 0.82rem;
+  padding: 0.25rem 0.45rem;
+}

@@ -18,3 +18,7 @@ transform/dbt_packages/
 
 # camada raw — ver nota no README sobre versionar ou nao
 data/
+
+# experimentos do mlflow
+ml/mlflow.db
+ml/artefatos/

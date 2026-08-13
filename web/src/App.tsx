@@ -3,6 +3,8 @@ import { Link, Route, Routes } from "react-router-dom";
 import Jogadores from "./pages/Jogadores";
 import Times from "./pages/Times";
 import Analises from "./pages/Analises";
+import CompeticaoPage from "./pages/Competicao";
+import Competicoes from "./pages/Competicoes";
 import JogadorPage from "./pages/Jogador";
 import JogoPage from "./pages/Jogo";
 import TimePage from "./pages/Time";
@@ -25,7 +27,8 @@ export default function App() {
           <strong>Futebol Brasileiro</strong>
         </Link>{" "}
         <Link to="/">Times</Link>{" · "}
-        <Link to="/jogadores">Jogadores</Link>{" "}
+        <Link to="/jogadores">Jogadores</Link>{" · "}
+        <Link to="/competicoes">Competições</Link>{" "}
         <span className="discreto">· Série A, Série B, Copa do Brasil e Paranaense</span>
       </header>
 
@@ -33,6 +36,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Times />} />
           <Route path="/jogadores" element={<Jogadores />} />
+          <Route path="/competicoes" element={<Competicoes />} />
+          <Route path="/competicoes/:leagueId/:season" element={<CompeticaoPage />} />
           <Route path="/times/:id" element={<TimePage />} />
           <Route path="/times/:id/analises" element={<Analises />} />
           <Route path="/jogos/:fixtureId" element={<JogoPage />} />

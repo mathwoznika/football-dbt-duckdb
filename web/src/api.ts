@@ -368,6 +368,40 @@ export type ArbitroDoTime = {
   ultimo_jogo: string;
 };
 
+export type Competicao = {
+  league_id: number;
+  league_nome: string;
+  season: number;
+  times: number;
+  jogos: number;
+  campeao_id: number | null;
+  campeao: string | null;
+  tem_chaveamento: boolean;
+  tem_classificacao: boolean;
+};
+
+export type PontoDaEvolucao = {
+  rodada_n: number;
+  time_id: number;
+  time_nome: string;
+  posicao: number;
+  pontos_acum: number;
+};
+
+export type Transferencia = {
+  player_id: number;
+  jogador: string;
+  data: string;
+  tipo: string;
+  valor_eur: number | null;
+  /** 'chegou' ou 'saiu', do ponto de vista do clube consultado. */
+  sentido: string | null;
+  team_origem_id: number | null;
+  team_origem: string | null;
+  team_destino_id: number | null;
+  team_destino: string | null;
+};
+
 export type LinhaClassificacao = {
   posicao: number;
   time_id: number;
@@ -523,6 +557,18 @@ export const api = {
     get<ArbitroDoTime[]>(`/times/${team_id}/arbitragem${query({ min_jogos })}`),
 
   tecnicos: (team_id: number) => get<TecnicoDoTime[]>(`/times/${team_id}/tecnicos`),
+
+  competicoes: () => get<Competicao[]>("/competicoes"),
+
+  evolucao: (league_id: number, season: number) =>
+    get<PontoDaEvolucao[]>(
+      `/competicoes/${league_id}/temporadas/${season}/evolucao`,
+    ),
+
+  transferencias: (team_id: number, desde?: number, limite = 60) =>
+    get<Transferencia[]>(
+      `/times/${team_id}/transferencias${query({ desde, limite })}`,
+    ),
 
   artilheiros: (league_id: number, season: number, limite = 10) =>
     get<Artilheiro[]>(

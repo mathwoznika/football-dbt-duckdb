@@ -18,6 +18,7 @@ from api.schemas import (
     ArbitroDoTime,
     AtuacaoDoJogador,
     Confronto,
+    Competicao,
     ConfrontoEliminatorio,
     DesempenhoPorTempo,
     EstatisticaDaPartida,
@@ -29,9 +30,11 @@ from api.schemas import (
     JogoDaCampanha,
     LinhaClassificacao,
     Partida,
+    PontoDaEvolucao,
     TecnicoDoTime,
     TemporadaDoTime,
     Time,
+    Transferencia,
 )
 
 app = FastAPI(
@@ -468,7 +471,99 @@ def artilheiros(league_id: int, season: int, limite: int = Query(default=10, ge=
     )
 
 
+@app.get("/times/{team_id}/transferencias", response_model=list[Transferencia])
+def transferencias(
+    team_id: int,
+    desde: int | None = Query(default=None, description="Ano minimo"),
+    limite: int = Query(default=60, ge=1, le=500),
+):
+    """Movimentacoes de entrada e saida do clube.
+
+    So existe para os times consultados na extracao (hoje apenas o Coritiba) —
+    devolve lista vazia para os demais, e a tela some em vez de mostrar tabela
+    vazia.
+    """
+    return consultar(
+        """
+        select player_id, jogador, data, tipo, valor_eur, sentido,
+               team_origem_id, team_origem, team_destino_id, team_destino
+        from gold_transferencia
+        where team_id_consultado = ?
+          and (? is null or year(data) >= ?)
+        order by data desc
+        limit ?
+        """,
+        [team_id, desde, desde, limite],
+    )
+
+
 # ---------------------------------------------------------- competicoes
+
+
+@app.get("/competicoes", response_model=list[Competicao])
+def listar_competicoes():
+    """Indice das competicoes-temporada presentes na base."""
+    return consultar(
+        """
+        with jogos as (
+            select league_id, league_nome, season,
+                   count(distinct fixture_id) as jogos,
+                   count(distinct time_id)    as times
+            from silver_partida_time
+            group by all
+        ),
+        -- o campeao sai de lugares diferentes conforme o formato:
+        -- em mata-mata e quem venceu a final; em pontos corridos e o 1o
+        final as (
+            select league_id, season, vencedor_id
+            from gold_confronto_eliminatorio
+            where ordem_fase = 7
+        ),
+        lider as (
+            select league_id, season, time_id
+            from gold_classificacao
+            where posicao = 1
+        )
+        select jogos.league_id, jogos.league_nome, jogos.season,
+               jogos.times, jogos.jogos,
+               coalesce(final.vencedor_id, lider.time_id) as campeao_id,
+               time_campeao.team_nome as campeao,
+               final.vencedor_id is not null as tem_chaveamento,
+               exists (
+                   select 1 from gold_classificacao c
+                   where c.league_id = jogos.league_id and c.season = jogos.season
+               ) as tem_classificacao
+        from jogos
+        left join final
+               on final.league_id = jogos.league_id and final.season = jogos.season
+        left join lider
+               on lider.league_id = jogos.league_id and lider.season = jogos.season
+        left join silver_time as time_campeao
+               on time_campeao.team_id = coalesce(final.vencedor_id, lider.time_id)
+        order by jogos.season desc, jogos.jogos desc
+        """
+    )
+
+
+@app.get(
+    "/competicoes/{league_id}/temporadas/{season}/evolucao",
+    response_model=list[PontoDaEvolucao],
+)
+def evolucao(league_id: int, season: int):
+    """Posicao e pontos de cada time apos cada rodada.
+
+    Vazio em competicao sem pontos corridos — nao existe "posicao apos a
+    rodada" em mata-mata.
+    """
+    return consultar(
+        """
+        select rodada_n, time_id, time_nome, posicao, pontos_acum
+        from gold_evolucao_classificacao
+        where league_id = ? and season = ?
+        order by time_id, rodada_n
+        """,
+        [league_id, season],
+    )
 
 
 @app.get(

@@ -55,6 +55,10 @@ export default function TimePage() {
     () => (pronto ? api.artilheiros(leagueId!, season!, 10) : Promise.resolve([])),
     [season, leagueId],
   );
+  const { dados: transferencias } = useDados(
+    () => api.transferencias(teamId, 2020),
+    [teamId],
+  );
   const { dados: elenco } = useDados(
     () => (pronto ? api.elenco(teamId, season, leagueId) : Promise.resolve([])),
     [teamId, season, leagueId],
@@ -161,9 +165,16 @@ export default function TimePage() {
               {time?.fundacao ? ` · fundado em ${time.fundacao}` : ""}
             </div>
           </div>
-          <Link className="botao" to={`/times/${teamId}/analises`} style={{ marginLeft: "auto" }}>
-            Análises →
-          </Link>
+          <div className="linha" style={{ marginLeft: "auto", gap: "0.5rem" }}>
+            {season && leagueId && (
+              <Link className="botao" to={`/competicoes/${leagueId}/${season}`}>
+                Ver competição
+              </Link>
+            )}
+            <Link className="botao" to={`/times/${teamId}/analises`}>
+              Análises →
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -359,6 +370,55 @@ export default function TimePage() {
           </p>
         )}
       </div>
+
+      {/* ------------------------------------------ transferencias */}
+      {(transferencias?.length ?? 0) > 0 && (
+        <details className="cartao">
+          <summary>
+            <span className="titulo-summary">Transferências</span>{" "}
+            <span className="discreto">({transferencias!.length})</span>
+          </summary>
+          <p className="discreto">
+            Atenção à janela: as transferências vão até <strong>2026</strong>,
+            enquanto os jogos param em 2024 por limitação do plano da API. É o
+            único dado do projeto que alcança o presente.
+          </p>
+          <div className="tabela-wrap">
+            <table className="tabela-compacta">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th></th>
+                  <th>Jogador</th>
+                  <th>De</th>
+                  <th>Para</th>
+                  <th>Tipo</th>
+                  <th className="num">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transferencias?.map((t) => (
+                  <tr key={`${t.player_id}-${t.data}-${t.team_destino_id}`}>
+                    <td className="discreto">{dataBr(t.data)}</td>
+                    <td>{t.sentido === "chegou" ? "↓" : "↑"}</td>
+                    <td>
+                      <Link to={`/jogadores/${t.player_id}`}>{t.jogador}</Link>
+                    </td>
+                    <td className="discreto">{t.team_origem ?? "—"}</td>
+                    <td className="discreto">{t.team_destino ?? "—"}</td>
+                    <td className="discreto">{t.tipo}</td>
+                    <td className="num">
+                      {t.valor_eur
+                        ? `€ ${(t.valor_eur / 1_000_000).toFixed(1)}M`
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
 
       {/* ----------------------------------------------- confrontos */}
       <details className="cartao">

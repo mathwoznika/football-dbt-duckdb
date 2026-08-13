@@ -171,6 +171,39 @@ models:
       - name: ordem_faixa
         tests: [not_null]
 
+  - name: gold_transferencia
+    description: >
+      Movimentacoes de jogadores, uma linha por transferencia.
+
+      Resolve duas particularidades da fonte. Ela DUPLICA — o mesmo jogador com
+      o mesmo destino em dias consecutivos, 55 linhas de 1.020 — e ficamos com a
+      data mais antiga. E o campo `type` MISTURA modalidade com valor ("Loan" ao
+      lado de "€ 1.5M"), entao aqui viram duas colunas: tipo em portugues e
+      valor_eur como numero.
+
+      ATENCAO A JANELA: as transferencias vao ate 2026, enquanto os jogos param
+      em 2024 por limitacao do plano Free. E o unico dado do projeto que alcanca
+      o presente, e a tela precisa avisar.
+
+      Cobertura: so o time consultado na extracao (hoje apenas o Coritiba).
+    columns:
+      - name: player_id
+        tests: [not_null]
+      - name: data
+        tests: [not_null]
+      - name: tipo
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - Empréstimo
+                - Retorno de empréstimo
+                - Livre
+                - Transferência
+                - Não informado
+      - name: valor_eur
+        description: Valor em euros quando a fonte informou; nulo na maioria.
+
   - name: gold_confronto_eliminatorio
     description: >
       Chaveamento do mata-mata. Grao: um CONFRONTO, nao uma partida — os dois

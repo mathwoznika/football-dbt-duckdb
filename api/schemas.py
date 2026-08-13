@@ -500,6 +500,50 @@ class ArbitroDoTime(BaseModel):
     ultimo_jogo: date
 
 
+class Competicao(BaseModel):
+    """Uma competicao numa temporada, para o indice."""
+
+    league_id: int
+    league_nome: str
+    season: int
+    times: int
+    jogos: int
+    campeao_id: int | None = None
+    campeao: str | None = None
+    tem_chaveamento: bool
+    tem_classificacao: bool
+
+
+class PontoDaEvolucao(BaseModel):
+    """Posicao e pontos de um time apos uma rodada."""
+
+    rodada_n: int
+    time_id: int
+    time_nome: str
+    posicao: int
+    pontos_acum: int
+
+
+class Transferencia(BaseModel):
+    """Uma movimentacao de jogador.
+
+    A janela deste dado e DIFERENTE do resto do projeto: vai ate 2026, enquanto
+    os jogos param em 2024 por limitacao do plano. E o unico dado daqui que
+    alcanca o presente.
+    """
+
+    player_id: int
+    jogador: str
+    data: date
+    tipo: str
+    valor_eur: float | None = None
+    sentido: str | None = Field(default=None, description="chegou ou saiu")
+    team_origem_id: int | None = None
+    team_origem: str | None = None
+    team_destino_id: int | None = None
+    team_destino: str | None = None
+
+
 class LinhaClassificacao(BaseModel):
     """Uma linha da tabela de classificacao."""
 
