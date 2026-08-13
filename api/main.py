@@ -27,11 +27,13 @@ from api.schemas import (
     EventoDaPartida,
     FormacaoDoTime,
     GolsPorPeriodo,
+    ImpactoDoBanco,
     JogadorEscalado,
     JogadorNaBase,
     JogadorNaTemporada,
     JogoDaCampanha,
     LinhaClassificacao,
+    OrigemDosGols,
     Partida,
     PontoDaEvolucao,
     TecnicoDoTime,
@@ -256,6 +258,54 @@ def estatisticas_da_temporada(
         order by season desc, jogos_com_estatistica desc
         """,
         [team_id, min_jogos],
+    )
+
+
+@app.get("/times/{team_id}/origem-dos-gols", response_model=list[OrigemDosGols])
+def origem_dos_gols(team_id: int):
+    """De onde vem o gol marcado e o sofrido: normal, penalti, contra, assistido.
+
+    Cobertura parcial — le os lances por partida, da onda 3. Cada linha traz
+    jogos_com_evento para a tela dizer sobre quantos jogos a conta foi feita.
+
+    Leia `assistencia_registrada` antes das colunas de assistencia: a fonte nao
+    registra passe decisivo na Copa do Brasil nem no Paranaense, e nesses casos
+    os campos vem nulos em vez de zero.
+    """
+    return consultar(
+        """
+        select league_id, league_nome, season, jogos_com_evento,
+               gols, gols_normais, gols_penalti, gols_contra_a_favor,
+               assistencia_registrada, gols_com_assistencia, gols_sem_assistencia,
+               sofridos, sofridos_normais, sofridos_penalti,
+               sofridos_contra_a_favor,
+               penalti_pct, assistidos_pct, sofridos_penalti_pct
+        from gold_gol_origem
+        where time_id = ?
+        order by season desc, jogos_com_evento desc
+        """,
+        [team_id],
+    )
+
+
+@app.get("/times/{team_id}/banco", response_model=list[ImpactoDoBanco])
+def impacto_do_banco(team_id: int):
+    """Quanto do ataque sai do banco, e a que altura o tecnico mexe.
+
+    Cobertura parcial, pelo mesmo motivo da origem dos gols.
+    """
+    return consultar(
+        """
+        select league_id, league_nome, season, jogos_com_evento,
+               gols_de_titular, gols_de_reserva, gols_sem_escalacao,
+               gols_do_banco_pct, assistencias_de_reserva,
+               substituicoes, substituicoes_por_jogo, minuto_medio_substituicao,
+               minuto_medio_primeira_troca, jogos_com_troca_no_1t
+        from gold_banco_impacto
+        where time_id = ?
+        order by season desc, jogos_com_evento desc
+        """,
+        [team_id],
     )
 
 
@@ -486,24 +536,57 @@ def elenco(
     team_id: int,
     season: int | None = Query(default=None),
     league_id: int | None = Query(default=None),
+    min_minutos: int = Query(
+        default=0,
+        ge=0,
+        description="Piso de minutos. Obrigatorio para comparar as colunas _90: "
+        "quem entrou 12 minutos e marcou aparece com 7,5 gols por 90.",
+    ),
+    grupo_posicao: str | None = Query(
+        default=None, description="Goleiro, Defesa, Meio ou Ataque"
+    ),
 ):
-    """Desempenho de cada jogador do elenco, por competicao e temporada."""
+    """Desempenho de cada jogador do elenco, por competicao e temporada.
+
+    Traz as duas leituras lado a lado: os totais respondem quem produziu mais na
+    temporada, e as colunas _90 respondem quem produz mais quando esta em campo.
+    Comparar totais entre quem jogou 3.200 minutos e quem jogou 450 mede
+    oportunidade, nao desempenho.
+
+    O padrao de min_minutos e 0 para nao mudar o comportamento de quem so quer a
+    lista do elenco. Quem for ordenar por coluna _90 precisa subir esse piso.
+    """
     return consultar(
         """
         select player_id, jogador_nome, team_id, team_nome, season, league_id,
-               league_nome, posicao, jogos_com_dado, jogos_com_minutos,
-               jogos_titular, minutos, nota_media,
-               melhor_nota, gols, assistencias, chutes, chutes_no_gol, passes,
-               desarmes, duelos, duelos_ganhos, dribles_tentados,
-               dribles_certos, faltas_cometidas, amarelos, vermelhos,
-               defesas, gols_sofridos
+               league_nome, posicao, grupo_posicao, jogos_com_dado,
+               jogos_com_minutos, jogos_titular, minutos, minutos_por_jogo,
+               nota_media, melhor_nota, gols, assistencias, chutes,
+               chutes_no_gol, passes, desarmes, duelos, duelos_ganhos,
+               dribles_tentados, dribles_certos, faltas_cometidas, amarelos,
+               vermelhos, defesas, gols_sofridos,
+               gols_90, assistencias_90, participacoes_90, chutes_90, passes_90,
+               passes_decisivos_90, desarmes_90, interceptacoes_90,
+               duelos_ganhos_90, dribles_certos_90, faltas_cometidas_90,
+               defesas_90, duelos_ganhos_pct, dribles_certos_pct, pontaria_pct
         from gold_jogador_temporada
         where team_id = ?
           and (? is null or season = ?)
           and (? is null or league_id = ?)
+          and coalesce(minutos, 0) >= ?
+          and (? is null or grupo_posicao = ?)
         order by minutos desc nulls last
         """,
-        [team_id, season, season, league_id, league_id],
+        [
+            team_id,
+            season,
+            season,
+            league_id,
+            league_id,
+            min_minutos,
+            grupo_posicao,
+            grupo_posicao,
+        ],
     )
 
 
@@ -513,12 +596,16 @@ def temporadas_do_jogador(player_id: int):
     linhas = consultar(
         """
         select player_id, jogador_nome, team_id, team_nome, season, league_id,
-               league_nome, posicao, jogos_com_dado, jogos_com_minutos,
-               jogos_titular, minutos, nota_media,
-               melhor_nota, gols, assistencias, chutes, chutes_no_gol, passes,
-               desarmes, duelos, duelos_ganhos, dribles_tentados,
-               dribles_certos, faltas_cometidas, amarelos, vermelhos,
-               defesas, gols_sofridos
+               league_nome, posicao, grupo_posicao, jogos_com_dado,
+               jogos_com_minutos, jogos_titular, minutos, minutos_por_jogo,
+               nota_media, melhor_nota, gols, assistencias, chutes,
+               chutes_no_gol, passes, desarmes, duelos, duelos_ganhos,
+               dribles_tentados, dribles_certos, faltas_cometidas, amarelos,
+               vermelhos, defesas, gols_sofridos,
+               gols_90, assistencias_90, participacoes_90, chutes_90, passes_90,
+               passes_decisivos_90, desarmes_90, interceptacoes_90,
+               duelos_ganhos_90, dribles_certos_90, faltas_cometidas_90,
+               defesas_90, duelos_ganhos_pct, dribles_certos_pct, pontaria_pct
         from gold_jogador_temporada
         where player_id = ?
         order by season desc, minutos desc nulls last

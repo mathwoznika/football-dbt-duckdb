@@ -60,9 +60,20 @@ export default function TimePage() {
     () => api.transferencias(teamId, 2020),
     [teamId],
   );
+  // Duas leituras do elenco. `porNoventa` alterna entre os totais (quem
+  // produziu na temporada) e as taxas por 90 minutos (quem produz em campo).
+  // O piso de minutos so existe por causa da segunda: sem ele, quem entrou 12
+  // minutos e marcou lidera a tabela com 7,5 gols por 90.
+  const [porNoventa, setPorNoventa] = useState(false);
+  const [minMinutos, setMinMinutos] = useState(0);
+  const [grupo, setGrupo] = useState("");
+
   const { dados: elenco } = useDados(
-    () => (pronto ? api.elenco(teamId, season, leagueId) : Promise.resolve([])),
-    [teamId, season, leagueId],
+    () =>
+      pronto
+        ? api.elenco(teamId, season, leagueId, minMinutos, grupo || undefined)
+        : Promise.resolve([]),
+    [teamId, season, leagueId, minMinutos, grupo],
   );
 
   const resumo = temporadas?.find(
@@ -304,6 +315,68 @@ export default function TimePage() {
       {/* -------------------------------------------------- elenco */}
       <div className="cartao">
         <h2>Elenco na competição</h2>
+        <p className="discreto">
+          <strong>Totais</strong> respondem quem produziu mais na temporada — o
+          que depende tanto de oportunidade quanto de desempenho.{" "}
+          <strong>Por 90 min</strong> coloca todo mundo na mesma escala e
+          responde quem produz mais quando está em campo. As duas leituras
+          valem, e nenhuma substitui a outra.
+        </p>
+
+        <div className="linha" style={{ margin: "1rem 0", flexWrap: "wrap" }}>
+          <label className="discreto">
+            Leitura{" "}
+            <select
+              value={porNoventa ? "90" : "total"}
+              onChange={(e) => {
+                const noventa = e.target.value === "90";
+                setPorNoventa(noventa);
+                // Ao entrar na leitura por 90 o piso sobe sozinho: a taxa sem
+                // amostra e a forma mais facil de ler errado esta tela.
+                if (noventa && minMinutos < 450) setMinMinutos(450);
+              }}
+            >
+              <option value="total">Totais</option>
+              <option value="90">Por 90 min</option>
+            </select>
+          </label>
+
+          <label className="discreto">
+            Mínimo de minutos{" "}
+            <select
+              value={minMinutos}
+              onChange={(e) => setMinMinutos(Number(e.target.value))}
+            >
+              <option value={0}>todos</option>
+              <option value={270}>270 (3 jogos)</option>
+              <option value={450}>450 (5 jogos)</option>
+              <option value={900}>900 (10 jogos)</option>
+            </select>
+          </label>
+
+          <label className="discreto">
+            Posição{" "}
+            <select value={grupo} onChange={(e) => setGrupo(e.target.value)}>
+              <option value="">todas</option>
+              <option value="Goleiro">Goleiro</option>
+              <option value="Defesa">Defesa</option>
+              <option value="Meio">Meio</option>
+              <option value="Ataque">Ataque</option>
+            </select>
+          </label>
+
+          <span className="discreto">{elenco?.length ?? 0} jogadores</span>
+        </div>
+
+        {porNoventa && minMinutos < 270 && (
+          <div className="aviso">
+            <strong>Sem piso de minutos, a taxa por 90 engana.</strong> Quem
+            entrou 12 minutos e marcou aparece com 7,5 gols por 90 — o número
+            está certo e não significa nada. Suba o mínimo de minutos para
+            comparar.
+          </div>
+        )}
+
         {elenco && elenco.length > 0 ? (
           <>
             <div className="tabela-wrap">
@@ -316,12 +389,27 @@ export default function TimePage() {
                     <th className="num">Tit.</th>
                     <th className="num">Min</th>
                     <th className="num">Nota</th>
-                    <th className="num">G</th>
-                    <th className="num">A</th>
-                    <th className="num">Fin.</th>
-                    <th className="num">Des.</th>
-                    <th className="num">Duelos</th>
-                    <th className="num">Cartões</th>
+                    {porNoventa ? (
+                      <>
+                        <th className="num">G+A/90</th>
+                        <th className="num">G/90</th>
+                        <th className="num">Fin./90</th>
+                        <th className="num">Des./90</th>
+                        <th className="num">Int./90</th>
+                        <th className="num">Duelos ganhos</th>
+                        <th className="num">Dribles certos</th>
+                        <th className="num">Mira</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="num">G</th>
+                        <th className="num">A</th>
+                        <th className="num">Fin.</th>
+                        <th className="num">Des.</th>
+                        <th className="num">Duelos</th>
+                        <th className="num">Cartões</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -332,7 +420,7 @@ export default function TimePage() {
                           <strong>{j.jogador_nome}</strong>
                         </Link>
                       </td>
-                      <td className="discreto">{j.posicao ?? "—"}</td>
+                      <td className="discreto">{j.grupo_posicao ?? j.posicao ?? "—"}</td>
                       <td className="num">{j.jogos_com_dado}</td>
                       <td className="num discreto">{j.jogos_titular}</td>
                       <td className="num discreto">{j.minutos ?? "—"}</td>
@@ -345,16 +433,45 @@ export default function TimePage() {
                           "—"
                         )}
                       </td>
-                      <td className="num">{j.gols ?? "—"}</td>
-                      <td className="num">{j.assistencias ?? "—"}</td>
-                      <td className="num discreto">{j.chutes ?? "—"}</td>
-                      <td className="num discreto">{j.desarmes ?? "—"}</td>
-                      <td className="num discreto">
-                        {j.duelos_ganhos ?? 0}/{j.duelos ?? 0}
-                      </td>
-                      <td className="num discreto">
-                        {(j.amarelos ?? 0) + (j.vermelhos ?? 0) || "—"}
-                      </td>
+                      {porNoventa ? (
+                        <>
+                          <td className="num">
+                            <strong>{j.participacoes_90 ?? "—"}</strong>
+                          </td>
+                          <td className="num">{j.gols_90 ?? "—"}</td>
+                          <td className="num discreto">{j.chutes_90 ?? "—"}</td>
+                          <td className="num discreto">{j.desarmes_90 ?? "—"}</td>
+                          <td className="num discreto">
+                            {j.interceptacoes_90 ?? "—"}
+                          </td>
+                          <td className="num">
+                            {j.duelos_ganhos_pct !== null
+                              ? `${j.duelos_ganhos_pct}%`
+                              : "—"}
+                          </td>
+                          <td className="num discreto">
+                            {j.dribles_certos_pct !== null
+                              ? `${j.dribles_certos_pct}%`
+                              : "—"}
+                          </td>
+                          <td className="num discreto">
+                            {j.pontaria_pct !== null ? `${j.pontaria_pct}%` : "—"}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="num">{j.gols ?? "—"}</td>
+                          <td className="num">{j.assistencias ?? "—"}</td>
+                          <td className="num discreto">{j.chutes ?? "—"}</td>
+                          <td className="num discreto">{j.desarmes ?? "—"}</td>
+                          <td className="num discreto">
+                            {j.duelos_ganhos ?? 0}/{j.duelos ?? 0}
+                          </td>
+                          <td className="num discreto">
+                            {(j.amarelos ?? 0) + (j.vermelhos ?? 0) || "—"}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>

@@ -15,7 +15,7 @@ apifootball.py     cliente da API-Football: HTTP, rate limit, gravação do raw
 extrair.py         o que extrair (ligas, temporadas, escopo). É o arquivo editado
 data/raw/          JSON cru, imutável, um arquivo por resposta da API
 data/warehouse.duckdb   banco de trabalho do dbt
-transform/         projeto dbt (38 models, 8 testes singulares)
+transform/         projeto dbt (40 models, 10 testes singulares)
 api/               nossa API (FastAPI) — não confundir com apifootball.py
 web/               front (Vite + React + TypeScript, 8 páginas)
 ml/treinar.py      experimento de previsão — PAUSADO, sem consumidor
@@ -142,10 +142,11 @@ Tudo o mais (calendários, ligas, times, classificações, artilheiros, técnico
 transferências) já está extraído. Parte da fila vai voltar vazia — ver o
 Paranaense nas *Particularidades do dado* do `contexto.md`.
 
-**Pronto e no ar:** 38 models, 26 endpoints, 8 páginas — times, jogadores,
+**Pronto e no ar:** 40 models, 28 endpoints, 8 páginas — times, jogadores,
 jogo com campinho posicionado, competições com classificação/artilharia/
-chaveamento/evolução, e análises (1º x 2º tempo, momento dos gols, técnicos,
-arbitragem, perfil estatístico, faixa do adversário, formações).
+chaveamento/evolução, elenco em duas leituras (totais e por 90 minutos), e
+análises (1º x 2º tempo, momento dos gols, origem dos gols, banco e trocas,
+técnicos, arbitragem, perfil estatístico, faixa do adversário, formações).
 
 **ML pausado**, e não por falta de esforço: ver a seção correspondente no
 `docs/contexto.md` antes de retomar.

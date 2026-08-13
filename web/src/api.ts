@@ -205,6 +205,37 @@ export type JogadorNaTemporada = {
   vermelhos: number | null;
   defesas: number | null;
   gols_sofridos: number | null;
+
+  /** Goleiro, Defesa, Meio ou Ataque. */
+  grupo_posicao: string | null;
+  minutos_por_jogo: number | null;
+
+  /**
+   * Producao por 90 minutos. Os totais acima medem quem produziu na temporada,
+   * o que depende de quanto jogou; estas medem quem produz quando esta em
+   * campo.
+   *
+   * NUNCA compare sem piso de minutos: quem entrou 12 minutos e marcou aparece
+   * com 7,5 gols por 90.
+   */
+  gols_90: number | null;
+  assistencias_90: number | null;
+  participacoes_90: number | null;
+  chutes_90: number | null;
+  passes_90: number | null;
+  passes_decisivos_90: number | null;
+  desarmes_90: number | null;
+  interceptacoes_90: number | null;
+  duelos_ganhos_90: number | null;
+  dribles_certos_90: number | null;
+  faltas_cometidas_90: number | null;
+  /** So faz sentido para goleiro; nulo para o resto do elenco. */
+  defesas_90: number | null;
+
+  /** Aproveitamentos: denominador e a propria tentativa, independem de minuto. */
+  duelos_ganhos_pct: number | null;
+  dribles_certos_pct: number | null;
+  pontaria_pct: number | null;
 };
 
 export type AtuacaoDoJogador = {
@@ -564,6 +595,57 @@ export type DesempenhoPorForcaAdversario = {
 };
 
 /**
+ * De onde vem o gol marcado e o sofrido. Cobertura parcial — `jogos_com_evento`
+ * diz sobre quantas partidas a conta foi feita.
+ */
+export type OrigemDosGols = {
+  league_id: number;
+  league_nome: string;
+  season: number;
+  jogos_com_evento: number;
+  gols: number;
+  gols_normais: number;
+  gols_penalti: number;
+  /** Gols contra marcados por jogador adversario. */
+  gols_contra_a_favor: number;
+  /**
+   * A fonte nao registra assistencia na Copa do Brasil nem no Paranaense. Onde
+   * isto e falso, as colunas de assistencia vem NULAS — zero seria
+   * indistinguivel de "ninguem assistiu".
+   */
+  assistencia_registrada: boolean;
+  gols_com_assistencia: number | null;
+  gols_sem_assistencia: number | null;
+  sofridos: number;
+  sofridos_normais: number;
+  sofridos_penalti: number;
+  sofridos_contra_a_favor: number;
+  penalti_pct: number | null;
+  assistidos_pct: number | null;
+  sofridos_penalti_pct: number | null;
+};
+
+/** O que o banco produz e a que altura o tecnico mexe. Cobertura parcial. */
+export type ImpactoDoBanco = {
+  league_id: number;
+  league_nome: string;
+  season: number;
+  jogos_com_evento: number;
+  gols_de_titular: number;
+  gols_de_reserva: number;
+  /** Gols em jogo com lance extraido e sem escalacao — autor nao identificado. */
+  gols_sem_escalacao: number;
+  gols_do_banco_pct: number | null;
+  assistencias_de_reserva: number | null;
+  substituicoes: number;
+  substituicoes_por_jogo: number | null;
+  minuto_medio_substituicao: number | null;
+  /** Descreve o tecnico melhor que a media de todas as trocas. */
+  minuto_medio_primeira_troca: number | null;
+  jogos_com_troca_no_1t: number;
+};
+
+/**
  * Faz a requisicao e converte a resposta.
  *
  * O <T> e um generico: quem chama diz qual tipo espera de volta, e o
@@ -633,8 +715,18 @@ export const api = {
   eventosDaPartida: (fixture_id: number) =>
     get<EventoDaPartida[]>(`/jogos/${fixture_id}/eventos`),
 
-  elenco: (team_id: number, season?: number, league_id?: number) =>
-    get<JogadorNaTemporada[]>(`/times/${team_id}/elenco${query({ season, league_id })}`),
+  // min_minutos e obrigatorio na pratica para ler as colunas _90; a tela sobe
+  // o piso sozinha quando o usuario troca para essa leitura.
+  elenco: (
+    team_id: number,
+    season?: number,
+    league_id?: number,
+    min_minutos?: number,
+    grupo_posicao?: string,
+  ) =>
+    get<JogadorNaTemporada[]>(
+      `/times/${team_id}/elenco${query({ season, league_id, min_minutos, grupo_posicao })}`,
+    ),
 
   temporadasDoJogador: (player_id: number) =>
     get<JogadorNaTemporada[]>(`/jogadores/${player_id}/temporadas`),
@@ -675,6 +767,11 @@ export const api = {
 
   forcaAdversario: (team_id: number) =>
     get<DesempenhoPorForcaAdversario[]>(`/times/${team_id}/forca-adversario`),
+
+  origemDosGols: (team_id: number) =>
+    get<OrigemDosGols[]>(`/times/${team_id}/origem-dos-gols`),
+
+  banco: (team_id: number) => get<ImpactoDoBanco[]>(`/times/${team_id}/banco`),
 
   competicoes: () => get<Competicao[]>("/competicoes"),
 

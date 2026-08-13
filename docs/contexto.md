@@ -158,6 +158,47 @@ substituições da base: em 580 de 580 o "assist" era reserva na escalação, e 
 saíram). O `gold_partida_evento` resolve isso na coluna `papel_relacionado`,
 para a tela não precisar saber da peculiaridade.
 
+**Contador nulo na fonte significa zero.** A API nunca escreve `0` num campo de
+contagem: em 2.021 atuações com minutos, `gols = 0` aparece **zero vez**, contra
+1.859 nulos e 162 positivos. O mesmo payload traz `conceded: 0` explícito para o
+goleiro, ou seja, ela sabe emitir zero quando quer — em contador ela usa nulo.
+
+A prova de que não é bloco de estatística faltando: entre quem atuou 60+
+minutos, `passes` é nulo em **0%** dos casos. Se a API estivesse omitindo a
+estatística daquele jogador, passe cairia junto. Ele nunca cai, então o nulo em
+gols (89,8%), chutes (52,7%) e desarmes (34,9%) é "não aconteceu".
+
+Sem `coalesce`, `sum` de tudo-nulo devolve nulo e o zagueiro que nunca marcou
+aparece com gols vazio — e qualquer soma que o envolva desaparece junto. A
+exceção conhecida é `duelos`, nulo em 5,5% de quem jogou 60+ minutos: ali é
+mesmo "não registrado", e o efeito de tratar como zero é subestimar, nunca
+inventar.
+
+**O gol contra é creditado ao time que se beneficia, mas guarda o autor
+adversário.** Murillo, do Corinthians, aparece sob "Coritiba". A consequência é
+assimétrica e vale registrar: somar gols por **time** é seguro — bate com o
+placar em 168 de 168 times-jogo conferidos —, enquanto somar por **jogador**
+exige excluir `Own Goal`, senão o autor recebe crédito por um gol do adversário.
+
+**Assistência não existe em toda competição.** A fonte marca passe decisivo em
+71% dos gols da Série A 2022 e 60% da de 2023, e em **zero** na Copa do Brasil e
+no Paranaense — em todos os gols, de todos os times. Não é um ataque que nunca
+teve assistência: é a competição que não tem o dado.
+
+Por isso o `gold_gol_origem` carrega `assistencia_registrada` e devolve as
+colunas de assistência **nulas** onde ela é falsa. Zero ali seria indistinguível
+de "ninguém assistiu", que é afirmação que o dado não sustenta. É o mesmo
+princípio do rótulo por quartil: não afirmar o que a fonte não carrega.
+
+**Entre duas colunas que respondem o mesmo, prefira a de cobertura maior.** O
+`gold_escalacao` tem `titular`, vindo do lineup, e `entrou_do_banco`, vindo do
+`fixture_players`. O segundo tem o nome mais óbvio para "entrou do banco" e está
+**0% preenchido no Paranaense** e 50% na Copa do Brasil, enquanto `titular` está
+100% em todas as ligas. Usar o nome óbvio jogou os 28 gols do estadual para
+"autor desconhecido" — a soma continuava fechando com o total, e o erro só
+aparecia na distribuição. É a mesma família do `bronze_coachs`: prefira a fonte
+mais próxima do fato.
+
 **A escalação vem com coordenadas.** O `grid` do lineup traz `"linha:coluna"` —
 `1:1` é o goleiro, e a linha cresce em direção ao ataque. Isso significa que
 desenhar o campinho **não exige codificar formação nenhuma**: o 4-2-3-1 e o

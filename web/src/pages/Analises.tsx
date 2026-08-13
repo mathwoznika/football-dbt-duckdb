@@ -107,6 +107,13 @@ export default function Analises() {
 
   const { dados: forca } = useDados(() => api.forcaAdversario(teamId), [teamId]);
 
+  const { dados: origem } = useDados(() => api.origemDosGols(teamId), [teamId]);
+  const { dados: banco } = useDados(() => api.banco(teamId), [teamId]);
+
+  // A nota de rodape sobre assistencia so faz sentido se alguma competicao da
+  // lista realmente nao registrar o dado.
+  const faltaAssistencia = (origem ?? []).some((o) => !o.assistencia_registrada);
+
   // escala das barras do gráfico de períodos
   const maxGols = Math.max(
     1,
@@ -252,6 +259,105 @@ export default function Analises() {
               <span className="legenda marcados" /> marcados{" "}
               <span className="legenda sofridos" /> sofridos. Cobertura parcial:
               só os jogos já alcançados pela onda 3.
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* -------------------------------------- de onde vem o gol */}
+      <div className="cartao">
+        <h2>De onde vem o gol</h2>
+        <p className="discreto">
+          A tabela não responde isso. Dois times com os mesmos 40 gols podem ter
+          chegado lá de formas opostas — um com dez pênaltis, outro com dois —, e
+          a diferença importa porque pênalti não se repete na mesma proporção no
+          ano seguinte.
+        </p>
+
+        {(origem?.length ?? 0) === 0 ? (
+          <p className="discreto" style={{ marginBottom: 0 }}>
+            Nenhum lance extraído para este time ainda.
+          </p>
+        ) : (
+          <>
+            <div className="tabela-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Temporada</th>
+                    <th>Competição</th>
+                    <th className="num">J*</th>
+                    <th className="num">Gols</th>
+                    <th className="num">Normais</th>
+                    <th className="num">Pênaltis</th>
+                    <th className="num">Contra</th>
+                    <th className="num">Assistidos</th>
+                    <th className="num">Sofridos</th>
+                    <th className="num">Sofr. pênalti</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {origem?.map((o) => (
+                    <tr key={`${o.season}-${o.league_id}`}>
+                      <td>{o.season}</td>
+                      <td className="discreto">{o.league_nome}</td>
+                      <td className="num discreto">{o.jogos_com_evento}</td>
+                      <td className="num">
+                        <strong>{o.gols}</strong>
+                      </td>
+                      <td className="num discreto">{o.gols_normais}</td>
+                      <td className="num">
+                        {o.gols_penalti}
+                        {o.penalti_pct !== null && (
+                          <span className="discreto"> ({o.penalti_pct}%)</span>
+                        )}
+                      </td>
+                      <td className="num discreto">{o.gols_contra_a_favor}</td>
+                      <td className="num">
+                        {/* Nulo aqui NAO e zero: a competicao nao registra o
+                            dado. Mostrar 0 afirmaria que ninguem assistiu. */}
+                        {o.assistencia_registrada ? (
+                          <>
+                            {o.gols_com_assistencia}
+                            {o.assistidos_pct !== null && (
+                              <span className="discreto">
+                                {" "}
+                                ({o.assistidos_pct}%)
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="discreto" title="A fonte não registra assistência nesta competição">
+                            não registrado
+                          </span>
+                        )}
+                      </td>
+                      <td className="num">{o.sofridos}</td>
+                      <td className="num discreto">
+                        {o.sofridos_penalti}
+                        {o.sofridos_penalti_pct !== null && (
+                          <span> ({o.sofridos_penalti_pct}%)</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="discreto" style={{ marginBottom: 0 }}>
+              * jogos com lances extraídos, não a competição inteira — a onda 3
+              ainda está em andamento. <strong>Contra</strong> são gols contra
+              marcados por jogador adversário, que a fonte credita ao time
+              beneficiado, como no placar.
+              {faltaAssistencia && (
+                <>
+                  {" "}
+                  Onde aparece <strong>não registrado</strong>, a fonte não
+                  guarda passe decisivo naquela competição — mostrar zero
+                  afirmaria que nenhum gol teve assistência, o que o dado não
+                  sustenta.
+                </>
+              )}
             </p>
           </>
         )}
@@ -558,6 +664,88 @@ export default function Analises() {
               Leia a coluna <strong>J</strong> antes do aproveitamento: 100% com
               uma partida é uma partida, não uma tendência — por isso o
               percentual só ganha cor a partir de três jogos.
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* -------------------------------------- o banco e as trocas */}
+      <div className="cartao">
+        <h2>O banco e as trocas</h2>
+        <p className="discreto">
+          Duas perguntas que só existem porque o lance de substituição guarda o{" "}
+          <strong>minuto</strong>: quanto do ataque sai de quem entrou, e a que
+          altura o técnico mexe. A primeira troca descreve a intenção melhor que
+          a média de todas, que mistura ajuste tático com queima de tempo aos 88.
+        </p>
+
+        {(banco?.length ?? 0) === 0 ? (
+          <p className="discreto" style={{ marginBottom: 0 }}>
+            Nenhum lance extraído para este time ainda.
+          </p>
+        ) : (
+          <>
+            <div className="tabela-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Temporada</th>
+                    <th>Competição</th>
+                    <th className="num">J*</th>
+                    <th className="num">Gols de titular</th>
+                    <th className="num">Gols do banco</th>
+                    <th className="num">% do banco</th>
+                    <th className="num">Assist. do banco</th>
+                    <th className="num">Trocas/jogo</th>
+                    <th className="num">1ª troca</th>
+                    <th className="num">Trocas no 1º T</th>
+                    <th className="num">Autor n/d</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {banco?.map((b) => (
+                    <tr key={`${b.season}-${b.league_id}`}>
+                      <td>{b.season}</td>
+                      <td className="discreto">{b.league_nome}</td>
+                      <td className="num discreto">{b.jogos_com_evento}</td>
+                      <td className="num">{b.gols_de_titular}</td>
+                      <td className="num">
+                        <strong>{b.gols_de_reserva}</strong>
+                      </td>
+                      <td className="num">
+                        <span
+                          className={`nota ${(b.gols_do_banco_pct ?? 0) >= 25 ? "boa" : ""}`}
+                        >
+                          {b.gols_do_banco_pct !== null
+                            ? `${b.gols_do_banco_pct}%`
+                            : "—"}
+                        </span>
+                      </td>
+                      <td className="num discreto">
+                        {b.assistencias_de_reserva ?? "n/r"}
+                      </td>
+                      <td className="num discreto">
+                        {b.substituicoes_por_jogo ?? "—"}
+                      </td>
+                      <td className="num">
+                        {b.minuto_medio_primeira_troca !== null
+                          ? `${b.minuto_medio_primeira_troca}'`
+                          : "—"}
+                      </td>
+                      <td className="num discreto">{b.jogos_com_troca_no_1t}</td>
+                      <td className="num discreto">{b.gols_sem_escalacao}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="discreto" style={{ marginBottom: 0 }}>
+              * jogos com lances extraídos. <strong>Autor n/d</strong> são gols
+              em partida que tem lance e não tem escalação, então o autor não
+              casa com ninguém — a coluna fica visível para que titular mais
+              banco sempre feche com o total, em vez de a conta sumir.{" "}
+              <strong>n/r</strong> em assistência é competição que a fonte não
+              registra.
             </p>
           </>
         )}

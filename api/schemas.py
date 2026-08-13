@@ -297,6 +297,40 @@ class JogadorNaTemporada(BaseModel):
     defesas: int | None = None
     gols_sofridos: int | None = None
 
+    grupo_posicao: str | None = Field(
+        default=None, description="Goleiro, Defesa, Meio ou Ataque"
+    )
+    minutos_por_jogo: float | None = None
+
+    # Producao por 90 minutos: responde "quem produz quando esta em campo",
+    # enquanto os totais acima respondem "quem produziu na temporada". As duas
+    # leituras convivem e nenhuma substitui a outra.
+    #
+    # CUIDADO: quem entrou 12 minutos e marcou aparece com 7,5 gols por 90. A
+    # taxa e correta e inutil — sempre filtre por minutos antes de comparar. O
+    # endpoint de elenco ja entra com um piso por padrao.
+    gols_90: float | None = None
+    assistencias_90: float | None = None
+    participacoes_90: float | None = Field(
+        default=None, description="Gols mais assistencias por 90 minutos"
+    )
+    chutes_90: float | None = None
+    passes_90: float | None = None
+    passes_decisivos_90: float | None = None
+    desarmes_90: float | None = None
+    interceptacoes_90: float | None = None
+    duelos_ganhos_90: float | None = None
+    dribles_certos_90: float | None = None
+    faltas_cometidas_90: float | None = None
+    # so faz sentido para goleiro; vem nulo para o resto do elenco
+    defesas_90: float | None = None
+
+    # Aproveitamentos: o denominador e a propria tentativa, entao independem de
+    # minuto e toleram amostra menor que as taxas por 90.
+    duelos_ganhos_pct: float | None = None
+    dribles_certos_pct: float | None = None
+    pontaria_pct: float | None = None
+
 
 class AtuacaoDoJogador(BaseModel):
     """Como um jogador foi numa partida especifica."""
@@ -708,3 +742,81 @@ class DesempenhoPorForcaAdversario(BaseModel):
     posicao_media_adversario: float = Field(
         description="Posicao media de quem ele enfrentou dentro da faixa"
     )
+
+
+class OrigemDosGols(BaseModel):
+    """De onde vem o gol marcado e o sofrido, numa competicao e temporada.
+
+    Cobertura PARCIAL: sai dos lances por partida, que so existem para os jogos
+    ja alcancados pela onda 3. `jogos_com_evento` diz sobre quantas partidas a
+    conta foi feita.
+
+    Gol contra e atribuido ao time que se beneficia, seguindo a fonte — o que
+    torna a soma por time igual ao placar. Ele so nao entra na leitura por
+    autor, porque o jogador e do time adversario.
+    """
+
+    league_id: int
+    league_nome: str
+    season: int
+    jogos_com_evento: int
+
+    gols: int
+    gols_normais: int
+    gols_penalti: int
+    gols_contra_a_favor: int = Field(
+        description="Gols contra marcados por jogador adversario"
+    )
+
+    assistencia_registrada: bool = Field(
+        description="Se a competicao registra assistencia. Quando falso, as "
+        "colunas de assistencia vem nulas — a fonte nao cobre a competicao, e "
+        "zero seria indistinguivel de 'ninguem assistiu'."
+    )
+    gols_com_assistencia: int | None = None
+    gols_sem_assistencia: int | None = None
+
+    sofridos: int
+    sofridos_normais: int
+    sofridos_penalti: int
+    sofridos_contra_a_favor: int
+
+    penalti_pct: float | None = None
+    assistidos_pct: float | None = None
+    sofridos_penalti_pct: float | None = None
+
+
+class ImpactoDoBanco(BaseModel):
+    """O que o banco produz e a que altura o tecnico mexe.
+
+    Cobertura PARCIAL, pelo mesmo motivo da origem dos gols.
+
+    `gols_sem_escalacao` fica exposto de proposito: sao gols em partida com
+    lance extraido e sem escalacao, entao o autor nao casa com ninguem. Sem essa
+    coluna, titular mais reserva nao fecharia com o total de gols.
+    """
+
+    league_id: int
+    league_nome: str
+    season: int
+    jogos_com_evento: int
+
+    gols_de_titular: int
+    gols_de_reserva: int = Field(
+        description="Gols de quem estava entre os reservas e entrou no jogo"
+    )
+    gols_sem_escalacao: int
+    gols_do_banco_pct: float | None = None
+    assistencias_de_reserva: int | None = Field(
+        default=None, description="Nulo onde a competicao nao registra assistencia"
+    )
+
+    substituicoes: int
+    substituicoes_por_jogo: float | None = None
+    minuto_medio_substituicao: float | None = None
+    minuto_medio_primeira_troca: float | None = Field(
+        default=None,
+        description="A primeira troca descreve o tecnico melhor que a media de "
+        "todas, que mistura ajuste tatico com queima de tempo aos 88.",
+    )
+    jogos_com_troca_no_1t: int

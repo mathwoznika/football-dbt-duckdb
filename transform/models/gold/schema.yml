@@ -251,11 +251,40 @@ models:
     description: >
       Pagina de elenco. Depende da onda 3 — use jogos_com_dado para saber
       quanto da amostra ja existe antes de tirar conclusao.
+
+      Traz duas leituras no mesmo grao. Os totais respondem quem produziu mais
+      na temporada, o que mede oportunidade tanto quanto desempenho: quem jogou
+      3.201 minutos desarma mais que quem jogou 452 sem ser melhor nisso. As
+      colunas _90 poem todos na mesma escala e respondem quem produz quando
+      esta em campo. Nenhuma substitui a outra.
     columns:
       - name: player_id
         tests: [not_null]
       - name: team_id
         tests: [not_null]
+      - name: gols
+        description: >
+          Zero de verdade, nao nulo. A fonte nunca escreve 0 num contador — em
+          2.021 atuacoes com minutos, `gols = 0` aparece zero vez contra 1.859
+          nulos —, e o mesmo payload traz `conceded: 0` explicito, ou seja, ela
+          sabe emitir zero quando quer. O coalesce no model traduz isso; sem
+          ele, `sum` de tudo-nulo devolveria nulo e todo zagueiro apareceria com
+          gols vazio. Vale para os demais contadores.
+        tests: [not_null]
+      - name: grupo_posicao
+        description: >
+          Goleiro, Defesa, Meio ou Ataque. Sai do model e nao da tela porque
+          agrupar por posicao e pergunta sobre o dado: comparar desarme de
+          zagueiro com desarme de atacante nao diz nada.
+        tests:
+          - accepted_values:
+              values: ['Goleiro', 'Defesa', 'Meio', 'Ataque']
+      - name: participacoes_90
+        description: >
+          Gols mais assistencias por 90 minutos. EXIGE piso de minutos de quem
+          consome: quem entrou 12 minutos e marcou aparece com 7,5 gols por 90.
+          O corte nao e feito no model de proposito — filtrar e trabalho de quem
+          consulta, a mesma regra que faz o gold_campanha nao filtrar clube.
 
   - name: gold_tecnico_desempenho
     description: >
@@ -347,6 +376,56 @@ models:
       - name: formacao
         tests: [not_null]
       - name: jogos
+        tests: [not_null]
+
+  - name: gold_gol_origem
+    description: >
+      De onde vem o gol marcado e o sofrido: normal, penalti ou contra, e quanto
+      sai com assistencia. A tabela nao responde isso — dois times com 40 gols
+      podem ter chegado la de formas opostas.
+
+      ATRIBUICAO DO GOL CONTRA, verificada: a API atribui o evento ao time que
+      se BENEFICIA, mas guarda no campo jogador o autor, que e do time
+      adversario. Somar gols por TIME e seguro e bate com o placar em 168 de
+      168 times-jogo; somar por JOGADOR exige excluir 'Own Goal'.
+
+      Cobertura parcial — so jogos com evento extraido, contados em
+      jogos_com_evento.
+    columns:
+      - name: time_id
+        tests: [not_null]
+      - name: jogos_com_evento
+        tests: [not_null]
+      - name: assistencia_registrada
+        description: >
+          Se a competicao-temporada registra assistencia. A fonte marca em 71%
+          dos gols da Serie A 2022 e em ZERO na Copa do Brasil e no Paranaense,
+          em todos os gols de todos os times. Onde e falso, as colunas de
+          assistencia vem NULAS — zero seria indistinguivel de "ninguem
+          assistiu", afirmacao que o dado nao sustenta.
+        tests: [not_null]
+
+  - name: gold_banco_impacto
+    description: >
+      O que o banco produz e quando o tecnico mexe. Sai do minuto guardado no
+      evento de substituicao, que ate aqui so era lido na linha do tempo de uma
+      partida.
+
+      Usa `titular` do lineup, e nao `entrou_do_banco` do fixture_players: a
+      segunda tem nome mais obvio e esta 0% preenchida no Paranaense. Entre duas
+      colunas que respondem o mesmo, prefira a que vem da fonte mais proxima do
+      fato.
+
+      gols_sem_escalacao fica visivel de proposito — sao gols em jogo com evento
+      e sem lineup. Escondê-los faria titular mais reserva nao fechar com o
+      total, e o teste assert_gol_origem_fecha_com_banco guarda essa conta.
+    columns:
+      - name: time_id
+        tests: [not_null]
+      - name: jogos_com_evento
+        tests: [not_null]
+      - name: gols_de_reserva
+        description: Gols de quem estava entre os reservas e entrou durante o jogo.
         tests: [not_null]
 
   - name: gold_desempenho_por_forca_adversario
