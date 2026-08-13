@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api } from "../api";
+import Metrica from "../components/Metrica";
 import { useDados } from "../useDados";
 
 function dataBr(iso: string) {
@@ -186,24 +187,3 @@ function classeDaNota(nota: number) {
   return "media";
 }
 
-function Metrica({
-  rotulo,
-  valor,
-  nota,
-}: {
-  rotulo: string;
-  valor: string | number;
-  nota?: string;
-}) {
-  return (
-    <div className="metrica">
-      <div className="rotulo">{rotulo}</div>
-      <div className="valor">{valor}</div>
-      {nota && (
-        <div className="rotulo" style={{ textTransform: "none", letterSpacing: 0 }}>
-          {nota}
-        </div>
-      )}
-    </div>
-  );
-}

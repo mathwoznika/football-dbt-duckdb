@@ -462,6 +462,108 @@ export type Confronto = {
 };
 
 /**
+ * Perfil estatistico coletivo numa temporada.
+ *
+ * COBERTURA PARCIAL, e a tela precisa dizer isso: `jogos_com_estatistica` e
+ * `cobertura_pct` contam de quantas partidas cada media saiu. Fora do Coritiba
+ * quase todo time aparece com um jogo, porque a API devolve os dois lados de
+ * cada partida extraida — media de temporada tirada dali seria mentira.
+ */
+export type EstatisticaDaTemporada = {
+  league_id: number;
+  league_nome: string;
+  season: number;
+  jogos_com_estatistica: number;
+  jogos_na_competicao: number;
+  cobertura_pct: number;
+  pontos: number;
+  gols_pro: number;
+  gols_contra: number;
+  pontos_por_jogo: number | null;
+  posse_media_pct: number | null;
+  passes_por_jogo: number | null;
+  precisao_passe_media_pct: number | null;
+  chutes_por_jogo: number | null;
+  chutes_no_gol_por_jogo: number | null;
+  chutes_na_area_por_jogo: number | null;
+  escanteios_por_jogo: number | null;
+  impedimentos_por_jogo: number | null;
+  pontaria_pct: number | null;
+  conversao_pct: number | null;
+  /** Nulo quando o time nao marcou na amostra. */
+  chutes_por_gol: number | null;
+  chutes_sofridos_por_jogo: number | null;
+  chutes_no_gol_sofridos_por_jogo: number | null;
+  chutes_na_area_sofridos_por_jogo: number | null;
+  escanteios_sofridos_por_jogo: number | null;
+  defesas_goleiro_por_jogo: number | null;
+  pontaria_adversario_pct: number | null;
+  conversao_sofrida_pct: number | null;
+  faltas_por_jogo: number | null;
+  faltas_sofridas_por_jogo: number | null;
+  amarelos_por_jogo: number | null;
+  amarelos: number | null;
+  vermelhos: number | null;
+  primeiro_jogo: string;
+  ultimo_jogo: string;
+};
+
+/** Aproveitamento com cada desenho tatico. Leia `jogos` antes do percentual. */
+export type FormacaoDoTime = {
+  league_id: number;
+  league_nome: string;
+  season: number;
+  formacao: string;
+  jogos: number;
+  vitorias: number;
+  empates: number;
+  derrotas: number;
+  pontos: number;
+  aproveitamento_pct: number;
+  gols_pro: number;
+  gols_contra: number;
+  saldo: number;
+  gols_por_jogo: number;
+  gols_sofridos_por_jogo: number;
+  jogos_sem_sofrer_gol: number;
+  jogos_casa: number;
+  jogos_fora: number;
+  tecnicos: string | null;
+  primeiro_jogo: string;
+  ultimo_jogo: string;
+};
+
+/**
+ * Aproveitamento contra cada quarto da tabela. NAO depende da onda 3 — cobre
+ * todos os jogos, entao aqui nao ha ressalva de amostra.
+ */
+export type DesempenhoPorForcaAdversario = {
+  league_id: number;
+  league_nome: string;
+  season: number;
+  /** 1 a 4, do topo para o fim da tabela. */
+  faixa_adversario: number;
+  faixa_rotulo: string;
+  times_na_competicao: number;
+  /** Tamanho real da faixa — o quartil nem sempre divide exato. */
+  times_na_faixa: number;
+  jogos: number;
+  vitorias: number;
+  empates: number;
+  derrotas: number;
+  pontos: number;
+  aproveitamento_pct: number;
+  gols_pro: number;
+  gols_contra: number;
+  saldo: number;
+  jogos_casa: number;
+  pontos_casa: number | null;
+  jogos_fora: number;
+  pontos_fora: number | null;
+  posicao_media_adversario: number;
+};
+
+/**
  * Faz a requisicao e converte a resposta.
  *
  * O <T> e um generico: quem chama diz qual tipo espera de volta, e o
@@ -557,6 +659,22 @@ export const api = {
     get<ArbitroDoTime[]>(`/times/${team_id}/arbitragem${query({ min_jogos })}`),
 
   tecnicos: (team_id: number) => get<TecnicoDoTime[]>(`/times/${team_id}/tecnicos`),
+
+  // As duas primeiras leem a onda 3 e vem vazias para competicao sem dado —
+  // o Paranaense nunca aparece, porque a API nao tem estatistica dele.
+  // forcaAdversario sai do placar e cobre a base inteira.
+  estatisticasDaTemporada: (team_id: number, min_jogos = 1) =>
+    get<EstatisticaDaTemporada[]>(
+      `/times/${team_id}/estatisticas-temporada${query({ min_jogos })}`,
+    ),
+
+  formacoes: (team_id: number, season?: number, min_jogos = 1) =>
+    get<FormacaoDoTime[]>(
+      `/times/${team_id}/formacoes${query({ season, min_jogos })}`,
+    ),
+
+  forcaAdversario: (team_id: number) =>
+    get<DesempenhoPorForcaAdversario[]>(`/times/${team_id}/forca-adversario`),
 
   competicoes: () => get<Competicao[]>("/competicoes"),
 

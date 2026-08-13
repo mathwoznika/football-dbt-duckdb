@@ -15,7 +15,7 @@ apifootball.py     cliente da API-Football: HTTP, rate limit, gravação do raw
 extrair.py         o que extrair (ligas, temporadas, escopo). É o arquivo editado
 data/raw/          JSON cru, imutável, um arquivo por resposta da API
 data/warehouse.duckdb   banco de trabalho do dbt
-transform/         projeto dbt (35 models, 6 testes singulares)
+transform/         projeto dbt (38 models, 8 testes singulares)
 api/               nossa API (FastAPI) — não confundir com apifootball.py
 web/               front (Vite + React + TypeScript, 8 páginas)
 ml/treinar.py      experimento de previsão — PAUSADO, sem consumidor
@@ -61,8 +61,11 @@ negócio, sem escolher entre fontes redundantes.
 **Silver é universal.** Todos os times, nenhum filtro de clube. Nada de `147`
 hardcoded em silver — o recorte do Coritiba pertence ao gold.
 
-**A API não calcula.** Endpoints só selecionam, filtram e ordenam. Lógica nova
-vira model de gold, onde fica versionada e testada.
+**A API não calcula, e o front também não.** Endpoints só selecionam, filtram e
+ordenam. Lógica nova vira model de gold, onde fica versionada e testada. Vale
+para a tela pelo mesmo motivo: dividir o tamanho da tabela por 4 para achar o
+tamanho do quartil funciona em liga de 20 times e mente numa de 18 — o número
+tem que sair do mart, que sabe a resposta, e não de uma conta na renderização.
 
 **Features de ML não podem vazar.** Toda janela em `gold_features_partida`
 termina em `1 preceding`, nunca `current row`. As colunas de alvo têm prefixo
@@ -90,6 +93,32 @@ O extrator é idempotente: o que já está em `data/raw` é pulado sem gastar na
 **`_meta.params` é essencial.** Os endpoints por jogo não devolvem o
 `fixture_id` no corpo — ele só existe nos parâmetros que gravamos.
 
+**Campo JSON de tipo misto perde o cast com `::varchar`.** Quando um campo do
+payload mistura número e texto, o DuckDB o infere como `JSON` — e ali
+`::varchar` **preserva as aspas**. O valor `"52%"` vira `'"52%"'`, tirar o `%`
+deixa `'"52"'`, e o `try_cast` para inteiro devolve nulo sem erro nenhum. Foi
+assim que `posse_pct` e `precisao_passe_pct` ficaram nulas em 130 de 130 linhas
+desde que o pipeline nasceu, com a tela mostrando campo vazio. Use
+`campo ->> '$'`, que extrai o texto já desempacotado. Campo sempre-string vira
+VARCHAR e não sofre disso — é por isso que o `grid` do lineup escapou.
+
+Nenhum teste pega isso, porque a coluna existe e é só nula. O detector é varrer
+colunas 100% vazias:
+
+```bash
+env/bin/python -c "
+import duckdb
+con = duckdb.connect('data/warehouse.duckdb', read_only=True)
+for (t,) in con.execute(\"select table_name from duckdb_tables()\").fetchall():
+    cols = [r[0] for r in con.execute(f'describe {t}').fetchall()]
+    n = con.execute(f'select count(*) from {t}').fetchone()[0]
+    if not n: continue
+    v = con.execute('select ' + ','.join(f'count(\"{c}\")' for c in cols) + f' from {t}').fetchone()
+    vazias = [c for c, k in zip(cols, v) if k == 0]
+    if vazias: print(t, vazias)
+"
+```
+
 **Nomes sobrecarregados em português.** `cartao` já é o painel da interface no
 CSS — usar a mesma classe para cartão de arbitragem colapsou todos os painéis
 do app para 6px. Antes de criar uma classe, verifique se o nome já existe:
@@ -107,21 +136,23 @@ O mesmo cuidado vale para `time` (equipe vs. tempo) e `partida` (jogo vs. iníci
 
 ## Onde o projeto está
 
-**Extração:** onda 3 em 83 de 168 jogos, ~338 tarefas pendentes, uns 3,5 dias a
+**Extração:** onda 3 em 84 de 168 jogos, 338 tarefas pendentes, uns 3,5 dias a
 95 requisições/dia. Rodar `env/bin/python extrair.py` uma vez por dia até zerar.
 Tudo o mais (calendários, ligas, times, classificações, artilheiros, técnicos,
-transferências) já está extraído.
+transferências) já está extraído. Parte da fila vai voltar vazia — ver o
+Paranaense nas *Particularidades do dado* do `contexto.md`.
 
-**Pronto e no ar:** 35 models, 23 endpoints, 8 páginas — times, jogadores,
+**Pronto e no ar:** 38 models, 26 endpoints, 8 páginas — times, jogadores,
 jogo com campinho posicionado, competições com classificação/artilharia/
 chaveamento/evolução, e análises (1º x 2º tempo, momento dos gols, técnicos,
-arbitragem).
+arbitragem, perfil estatístico, faixa do adversário, formações).
 
 **ML pausado**, e não por falta de esforço: ver a seção correspondente no
 `docs/contexto.md` antes de retomar.
 
-**Próximo bloco:** Dagster, depois Postgres com docker-compose. O raciocínio
-está no fim do `contexto.md`.
+**Próximo bloco:** esgotar o que a base já tem em telas e relatórios, e só
+depois Dagster, Postgres e docker-compose. O raciocínio está no fim do
+`contexto.md`.
 
 ## Skills
 

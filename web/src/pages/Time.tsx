@@ -6,6 +6,7 @@ import CaminhoNoTorneio from "../components/CaminhoNoTorneio";
 import Chaveamento from "../components/Chaveamento";
 import Artilheiros from "../components/Artilheiros";
 import Classificacao from "../components/Classificacao";
+import Metrica from "../components/Metrica";
 import { useDados } from "../useDados";
 
 /** Formata "2023-12-07" como "07/12/2023" sem depender de biblioteca. */
@@ -473,25 +474,3 @@ function classeDaNota(nota: number) {
   return "media";
 }
 
-/** Cartao de metrica. A `nota` existe para desfazer ambiguidade de rotulo. */
-function Metrica({
-  rotulo,
-  valor,
-  nota,
-}: {
-  rotulo: string;
-  valor: string | number;
-  nota?: string;
-}) {
-  return (
-    <div className="metrica">
-      <div className="rotulo">{rotulo}</div>
-      <div className="valor">{valor}</div>
-      {nota && (
-        <div className="rotulo" style={{ textTransform: "none", letterSpacing: 0 }}>
-          {nota}
-        </div>
-      )}
-    </div>
-  );
-}

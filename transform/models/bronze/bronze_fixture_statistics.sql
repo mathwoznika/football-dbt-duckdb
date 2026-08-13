@@ -61,11 +61,17 @@ select
     max(case when est.type = 'Total passes'     then try_cast(est.value::varchar as int) end) as passes_total,
     max(case when est.type = 'Passes accurate'  then try_cast(est.value::varchar as int) end) as passes_certos,
 
-    -- estes dois chegam como texto no formato "52%"
+    -- Estes dois chegam como texto no formato "52%", e exigem `->> '$'` em vez
+    -- de `::varchar`. A diferenca e silenciosa e custou as duas colunas: o
+    -- campo e do tipo JSON, e ali `::varchar` PRESERVA as aspas do texto. O
+    -- valor virava '"52%"', o replace do % deixava '"52"', e o try_cast de uma
+    -- string com aspas devolve null — sem erro alto alto, so a coluna vazia.
+    -- Os numeros escapavam porque JSON numerico vira '17', sem aspas.
+    -- O `->> '$'` extrai o texto ja desempacotado.
     max(case when est.type = 'Ball Possession'
-             then try_cast(replace(est.value::varchar, '%', '') as int) end) as posse_pct,
+             then try_cast(replace(est.value ->> '$', '%', '') as int) end) as posse_pct,
     max(case when est.type = 'Passes %'
-             then try_cast(replace(est.value::varchar, '%', '') as int) end) as precisao_passe_pct,
+             then try_cast(replace(est.value ->> '$', '%', '') as int) end) as precisao_passe_pct,
 
     max(extraido_em) as extraido_em
 from estatisticas

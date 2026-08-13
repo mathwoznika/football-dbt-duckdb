@@ -128,6 +128,21 @@ dia 01, com `fim` nulo em passagens já encerradas e meses inteiros sem ninguém
 Use `bronze_fixture_lineups`, que diz quem estava no banco naquele jogo. Regra
 geral: prefira a fonte que é subproduto do fato à que é cadastro.
 
+**O Paranaense é raso na API, e isso muda o valor da cota.** Para a liga 606 os
+endpoints `fixture_statistics` e `fixture_players` voltam **vazios** — 17 de 17
+arquivos extraídos, nenhuma linha — e o lineup vem sem `grid`, então não há
+campinho posicionado. Só eventos e nomes de escalação existem. A Copa do Brasil
+vem pela metade: 2 dos 4 jogos de 2022 têm estatística.
+
+A consequência é de planejamento, não de modelagem: dos 338 pedidos que faltam,
+**56 são esses dois endpoints para os 28 jogos restantes do estadual**, e vão
+voltar vazios. Pular a liga 606 neles no `extrair.py` liberaria mais de meio dia
+de cota para a Série B 2024, que está inteiramente por extrair. Não foi feito —
+decisão consciente de não mexer no extrator agora —, mas quem for otimizar a
+fila começa por aqui.
+
+Nada disso é bug do pipeline: os arquivos crus estão vazios em `data/raw`.
+
 **Artilharia não é derivável da nossa base.** A onda 3 cobre só os jogos do
 Coritiba, então gols em Palmeiras × Flamengo não existem aqui. O
 `/players/topscorers` resolve com 1 requisição por liga-temporada.
@@ -267,21 +282,29 @@ na tela de arbitragem.
 
 ## Ordem planejada do que falta
 
-1. **Terminar a onda 3** — ~338 requisições, uns 3,5 dias. É o que mais entrega
+Esta lista já esteve duplicada — Dagster e Postgres apareciam duas vezes, em
+ordens contrárias, resíduo de duas edições. Foi consolidada; se ela voltar a ter
+o mesmo item em dois lugares, o de baixo é o antigo.
+
+1. **Terminar a onda 3** — 338 requisições, uns 3,5 dias. É o que mais entrega
    valor por requisição, então vem antes de qualquer extração nova. Quando
    fechar, as telas que hoje mostram cobertura parcial (momento dos gols,
-   estatística de jogo, elenco) se completam sozinhas.
-2. **Dagster** — deixou de ser cerimônia: há três etapas com dependência e
-   ritmos diferentes (extração diária, dbt depois dela, treino sob demanda). E
-   automatiza o `python extrair.py` que hoje é rodado à mão todo dia.
-3. **Postgres e docker-compose** — tirar a aplicação do "roda na minha máquina".
-4. **Retomar o ML** quando houver volume: plano Pro (2015+) e/ou onda 3
+   estatística de jogo, perfil estatístico, elenco) se completam sozinhas.
+   Lembrando que 56 desses pedidos vão voltar vazios, pelo Paranaense.
+2. **Esgotar em tela o que a base já tem.** Prioridade acima de infraestrutura:
+   dado extraído e não exibido não vale nada, e cada mart novo custa horas
+   contra os dias de cota que a extração custa. Foi o que revelou, numa sessão
+   só, que `silver_partida_estatistica` não tinha nenhum consumidor no gold e
+   que a posse de bola estava nula desde o começo. Enquanto houver coluna sem
+   consumidor, este item continua aberto.
+3. **Dagster** — três etapas com dependência e ritmos diferentes (extração
+   diária, dbt depois dela, treino sob demanda), e automatiza o `extrair.py`
+   que hoje é rodado à mão todo dia.
+4. **Postgres e docker-compose** — separar os papéis (DuckDB transforma,
+   Postgres serve) e tirar a aplicação do "roda na minha máquina". É aqui que o
+   MinIO entra, se a ideia de exercitar object storage for retomada.
+5. **Retomar o ML** quando houver volume: plano Pro (2015+) e/ou onda 3
    completa para as features de estatística.
-6. **Postgres** como camada de serving, quando a aplicação for para o ar.
-7. **Dagster**, por último: ele resolve orquestração de várias etapas
-   interdependentes, e orquestrar duas coisas rodadas à mão é cerimônia.
-8. **docker-compose**, junto com o Dagster. É aqui que o MinIO entra, se a ideia
-   de exercitar object storage for retomada.
 
 Condicionado ao plano pago: `/players` completo sobe para o topo, porque deixa
 de custar 3 dias de cota e passa a custar minutos.

@@ -296,3 +296,80 @@ models:
           - not_null
           - accepted_values:
               values: ['V', 'E', 'D']
+
+  - name: gold_time_estatistica_temporada
+    description: >
+      Perfil estatistico coletivo por competicao e temporada: posse, producao
+      ofensiva, o que foi produzido contra e disciplina. Primeiro mart a
+      agregar o silver_partida_estatistica — antes dele a onda 3 so era lida um
+      jogo por vez.
+
+      LEIA A COBERTURA ANTES DO NUMERO. A onda 3 cobre apenas os jogos do
+      Coritiba e o endpoint devolve os dois times, entao o adversario aparece
+      com um ou dois jogos e o Coritiba com dezenas. Use `jogos_com_estatistica`
+      e `cobertura_pct` para exigir amostra minima; sem isso a tela mostra o
+      perfil de temporada de um clube a partir de uma unica partida.
+
+      O Paranaense nao aparece: a API nao tem estatistica para a liga 606 e os
+      17 arquivos ja extraidos voltaram vazios.
+    columns:
+      - name: time_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('silver_time')
+              field: team_id
+      - name: jogos_com_estatistica
+        tests: [not_null]
+      - name: jogos_na_competicao
+        description: >
+          Total de jogos disputados na competicao, com estatistica ou sem. E o
+          denominador de cobertura_pct e o que permite a tela dizer "12 de 38".
+        tests: [not_null]
+      - name: pontaria_pct
+        description: >
+          Chutes no gol sobre chutes totais, calculado sobre os TOTAIS da
+          temporada e nao como media das razoes de cada jogo — assim um jogo de
+          2 chutes nao pesa igual a um de 20.
+
+  - name: gold_formacao_desempenho
+    description: >
+      Aproveitamento por formacao tatica. Responde com qual desenho o time
+      entrou, quantas vezes e o que colheu com cada um.
+
+      Depende do lineup, logo da onda 3, com a mesma ressalva de amostra do
+      gold_time_estatistica_temporada: o adversario costuma aparecer com um
+      jogo so. Filtre por `jogos` antes de ler aproveitamento — "100% num
+      4-3-3" com jogos = 1 e uma partida, nao uma tendencia.
+    columns:
+      - name: time_id
+        tests: [not_null]
+      - name: formacao
+        tests: [not_null]
+      - name: jogos
+        tests: [not_null]
+
+  - name: gold_desempenho_por_forca_adversario
+    description: >
+      Aproveitamento do time contra cada quarto da tabela. Nao depende da onda
+      3 — sai do placar dos 1.746 jogos, entao cobre os 153 times sem ressalva
+      de amostra.
+
+      A faixa e um quartil da classificacao final, o que funciona igual numa
+      competicao de 20 times e numa de 12. O rotulo e descritivo ("1o quarto da
+      tabela") e nao "G4" ou "zona de rebaixamento", porque quem classifica e
+      quem cai muda por competicao e por ano.
+
+      Circularidade assumida: a posicao final do adversario ja inclui o
+      resultado contra este time. Só a fase de pontos corridos entra, o mesmo
+      recorte do gold_classificacao.
+    columns:
+      - name: time_id
+        tests: [not_null]
+      - name: faixa_adversario
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4]
+      - name: jogos
+        tests: [not_null]

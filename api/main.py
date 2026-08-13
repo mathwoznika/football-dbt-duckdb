@@ -20,9 +20,12 @@ from api.schemas import (
     Confronto,
     Competicao,
     ConfrontoEliminatorio,
+    DesempenhoPorForcaAdversario,
     DesempenhoPorTempo,
     EstatisticaDaPartida,
+    EstatisticaDaTemporada,
     EventoDaPartida,
+    FormacaoDoTime,
     GolsPorPeriodo,
     JogadorEscalado,
     JogadorNaBase,
@@ -208,6 +211,107 @@ def gols_por_periodo(
         order by ordem_faixa
         """,
         [team_id, season, season, league_id, league_id],
+    )
+
+
+@app.get(
+    "/times/{team_id}/estatisticas-temporada",
+    response_model=list[EstatisticaDaTemporada],
+)
+def estatisticas_da_temporada(
+    team_id: int,
+    min_jogos: int = Query(
+        default=1,
+        ge=1,
+        description="Amostra minima. Fora do Coritiba quase todo time aparece "
+        "com um jogo so, porque o endpoint da API devolve os dois lados de cada "
+        "partida extraida.",
+    ),
+):
+    """Perfil estatistico do time por competicao e temporada.
+
+    Cobertura PARCIAL: le a onda 3, que ainda esta em andamento. Cada linha traz
+    jogos_com_estatistica e cobertura_pct para a tela nunca mostrar uma media
+    sem dizer de quantos jogos ela saiu.
+
+    O Campeonato Paranaense nao aparece: a API nao tem estatistica para essa
+    competicao, e os arquivos ja extraidos vieram vazios.
+    """
+    return consultar(
+        """
+        select league_id, league_nome, season, jogos_com_estatistica,
+               jogos_na_competicao, cobertura_pct, pontos, gols_pro, gols_contra,
+               pontos_por_jogo, posse_media_pct, passes_por_jogo,
+               precisao_passe_media_pct, chutes_por_jogo, chutes_no_gol_por_jogo,
+               chutes_na_area_por_jogo, escanteios_por_jogo,
+               impedimentos_por_jogo, pontaria_pct, conversao_pct, chutes_por_gol,
+               chutes_sofridos_por_jogo, chutes_no_gol_sofridos_por_jogo,
+               chutes_na_area_sofridos_por_jogo, escanteios_sofridos_por_jogo,
+               defesas_goleiro_por_jogo, pontaria_adversario_pct,
+               conversao_sofrida_pct, faltas_por_jogo, faltas_sofridas_por_jogo,
+               amarelos_por_jogo, amarelos, vermelhos,
+               primeiro_jogo, ultimo_jogo
+        from gold_time_estatistica_temporada
+        where time_id = ? and jogos_com_estatistica >= ?
+        order by season desc, jogos_com_estatistica desc
+        """,
+        [team_id, min_jogos],
+    )
+
+
+@app.get("/times/{team_id}/formacoes", response_model=list[FormacaoDoTime])
+def formacoes_do_time(
+    team_id: int,
+    season: int | None = Query(default=None, description="Filtra por temporada"),
+    min_jogos: int = Query(
+        default=1, ge=1, description="Esconde formacoes com poucos jogos"
+    ),
+):
+    """Com qual desenho tatico o time entrou, quantas vezes e o que colheu.
+
+    Vem da escalacao, entao cobre so os jogos ja alcancados pela onda 3. Leia
+    `jogos` antes do aproveitamento: 100% com uma partida nao e tendencia.
+    """
+    return consultar(
+        """
+        select league_id, league_nome, season, formacao, jogos, vitorias,
+               empates, derrotas, pontos, aproveitamento_pct, gols_pro,
+               gols_contra, saldo, gols_por_jogo, gols_sofridos_por_jogo,
+               jogos_sem_sofrer_gol, jogos_casa, jogos_fora, tecnicos,
+               primeiro_jogo, ultimo_jogo
+        from gold_formacao_desempenho
+        where time_id = ?
+          and (? is null or season = ?)
+          and jogos >= ?
+        order by season desc, jogos desc, aproveitamento_pct desc
+        """,
+        [team_id, season, season, min_jogos],
+    )
+
+
+@app.get(
+    "/times/{team_id}/forca-adversario",
+    response_model=list[DesempenhoPorForcaAdversario],
+)
+def forca_do_adversario(team_id: int):
+    """Aproveitamento contra cada quarto da tabela.
+
+    Ao contrario das outras analises que dependem de dado por jogo, esta cobre
+    a base inteira: sai do placar, nao da onda 3. So a fase de pontos corridos
+    entra, o mesmo recorte da classificacao — logo copa nao aparece aqui.
+    """
+    return consultar(
+        """
+        select league_id, league_nome, season, faixa_adversario, faixa_rotulo,
+               times_na_competicao, times_na_faixa,
+               jogos, vitorias, empates, derrotas, pontos,
+               aproveitamento_pct, gols_pro, gols_contra, saldo, jogos_casa,
+               pontos_casa, jogos_fora, pontos_fora, posicao_media_adversario
+        from gold_desempenho_por_forca_adversario
+        where time_id = ?
+        order by season desc, league_id, faixa_adversario
+        """,
+        [team_id],
     )
 
 

@@ -2,11 +2,47 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api } from "../api";
+import type { DesempenhoPorForcaAdversario, EstatisticaDaTemporada } from "../api";
+import Metrica from "../components/Metrica";
 import { useDados } from "../useDados";
 
 function dataBr(iso: string) {
   const [ano, mes, dia] = iso.split("-");
   return `${dia}/${mes}/${ano}`;
+}
+
+/**
+ * Pares pró/contra do perfil estatístico, na ordem em que aparecem.
+ *
+ * A barra divide o total entre os dois lados, igual à da tela de jogo: ela
+ * mostra a *proporção* entre produzir e sofrer, não a grandeza absoluta.
+ * Escalar pelo maior faria a barra do maior encostar sempre no fim.
+ */
+const COMPARACOES: {
+  rotulo: string;
+  pro: keyof EstatisticaDaTemporada;
+  contra: keyof EstatisticaDaTemporada;
+  pct?: boolean;
+}[] = [
+  { rotulo: "Finalizações por jogo", pro: "chutes_por_jogo", contra: "chutes_sofridos_por_jogo" },
+  { rotulo: "No gol por jogo", pro: "chutes_no_gol_por_jogo", contra: "chutes_no_gol_sofridos_por_jogo" },
+  { rotulo: "Dentro da área por jogo", pro: "chutes_na_area_por_jogo", contra: "chutes_na_area_sofridos_por_jogo" },
+  { rotulo: "Escanteios por jogo", pro: "escanteios_por_jogo", contra: "escanteios_sofridos_por_jogo" },
+  { rotulo: "Faltas por jogo", pro: "faltas_por_jogo", contra: "faltas_sofridas_por_jogo" },
+  { rotulo: "Pontaria", pro: "pontaria_pct", contra: "pontaria_adversario_pct", pct: true },
+  { rotulo: "Conversão", pro: "conversao_pct", contra: "conversao_sofrida_pct", pct: true },
+];
+
+/** Agrupa as faixas por competição-temporada, preservando a ordem da API. */
+function porCompeticao(linhas: DesempenhoPorForcaAdversario[]) {
+  const grupos = new Map<string, DesempenhoPorForcaAdversario[]>();
+  linhas.forEach((linha) => {
+    const chave = `${linha.season}-${linha.league_id}`;
+    const atual = grupos.get(chave) ?? [];
+    atual.push(linha);
+    grupos.set(chave, atual);
+  });
+  return [...grupos.entries()];
 }
 
 export default function Analises() {
@@ -46,6 +82,31 @@ export default function Analises() {
     (t) => t.season === season && t.league_id === leagueId,
   );
 
+  // Perfil estatístico: seletor próprio, montado a partir das linhas que o
+  // endpoint devolveu. Não dá para reaproveitar o seletor de cima porque a
+  // estatística não existe para toda competição — o Paranaense nunca aparece.
+  const { dados: estatisticas } = useDados(
+    () => api.estatisticasDaTemporada(teamId),
+    [teamId],
+  );
+  const [selEstat, setSelEstat] = useState("");
+  const chaveEstat =
+    selEstat ||
+    (estatisticas?.length
+      ? `${estatisticas[0].season}-${estatisticas[0].league_id}`
+      : "");
+  const perfil = estatisticas?.find(
+    (e) => `${e.season}-${e.league_id}` === chaveEstat,
+  );
+
+  const [minJogosFormacao, setMinJogosFormacao] = useState(1);
+  const { dados: formacoes } = useDados(
+    () => api.formacoes(teamId, undefined, minJogosFormacao),
+    [teamId, minJogosFormacao],
+  );
+
+  const { dados: forca } = useDados(() => api.forcaAdversario(teamId), [teamId]);
+
   // escala das barras do gráfico de períodos
   const maxGols = Math.max(
     1,
@@ -62,7 +123,8 @@ export default function Analises() {
               Análises · <Link to={`/times/${teamId}`}>{time?.team_nome}</Link>
             </h1>
             <div className="discreto">
-              Onde os pontos são ganhos e perdidos ao longo do jogo
+              Onde os pontos são ganhos e perdidos: ao longo do jogo, contra
+              quem, e com qual desenho
             </div>
           </div>
         </div>
@@ -190,6 +252,312 @@ export default function Analises() {
               <span className="legenda marcados" /> marcados{" "}
               <span className="legenda sofridos" /> sofridos. Cobertura parcial:
               só os jogos já alcançados pela onda 3.
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* ------------------------------------ perfil estatístico */}
+      <div className="cartao">
+        <h2>Perfil estatístico</h2>
+        <p className="discreto">
+          O que o time produziu e o que produziram contra ele, por jogo. Vem da
+          extração por partida, então a cobertura é parcial — cada número diz de
+          quantos jogos saiu.
+        </p>
+
+        {(estatisticas?.length ?? 0) === 0 ? (
+          <p className="discreto" style={{ marginBottom: 0 }}>
+            Nenhuma partida deste time teve estatística extraída ainda.
+          </p>
+        ) : (
+          <>
+            <div className="linha" style={{ marginBottom: "1rem" }}>
+              <select
+                value={chaveEstat}
+                onChange={(e) => setSelEstat(e.target.value)}
+              >
+                {estatisticas?.map((e) => (
+                  <option
+                    key={`${e.season}-${e.league_id}`}
+                    value={`${e.season}-${e.league_id}`}
+                  >
+                    {e.season} · {e.league_nome}
+                  </option>
+                ))}
+              </select>
+              {perfil && (
+                <span className="discreto">
+                  {perfil.jogos_com_estatistica} de {perfil.jogos_na_competicao}{" "}
+                  jogos com estatística ({perfil.cobertura_pct}%)
+                </span>
+              )}
+            </div>
+
+            {perfil && (
+              <>
+                <div className="metricas" style={{ marginBottom: "1.4rem" }}>
+                  <Metrica
+                    rotulo="Posse"
+                    valor={perfil.posse_media_pct ? `${perfil.posse_media_pct}%` : "—"}
+                    nota="média por jogo"
+                  />
+                  <Metrica
+                    rotulo="Precisão de passe"
+                    valor={
+                      perfil.precisao_passe_media_pct
+                        ? `${perfil.precisao_passe_media_pct}%`
+                        : "—"
+                    }
+                  />
+                  <Metrica
+                    rotulo="Passes"
+                    valor={perfil.passes_por_jogo ?? "—"}
+                    nota="por jogo"
+                  />
+                  <Metrica
+                    rotulo="Chutes por gol"
+                    valor={perfil.chutes_por_gol ?? "—"}
+                    nota={perfil.chutes_por_gol === null ? "não marcou" : undefined}
+                  />
+                  <Metrica
+                    rotulo="Defesas do goleiro"
+                    valor={perfil.defesas_goleiro_por_jogo ?? "—"}
+                    nota="por jogo"
+                  />
+                  <Metrica
+                    rotulo="Amarelos"
+                    valor={perfil.amarelos_por_jogo ?? "—"}
+                    nota="por jogo"
+                  />
+                </div>
+
+                <div className="estatisticas">
+                  {COMPARACOES.map(({ rotulo, pro, contra, pct }) => {
+                    const a = (perfil[pro] as number | null) ?? 0;
+                    const b = (perfil[contra] as number | null) ?? 0;
+                    if (a === 0 && b === 0) return null;
+                    const total = a + b || 1;
+                    return (
+                      <div className="estat-linha" key={rotulo}>
+                        <span className="estat-valor">
+                          {a}
+                          {pct ? "%" : ""}
+                        </span>
+                        <div className="estat-meio">
+                          <span className="estat-rotulo">{rotulo}</span>
+                          <div className="estat-barra">
+                            <div
+                              className="lado-casa"
+                              style={{ width: `${(a / total) * 100}%` }}
+                            />
+                            <div
+                              className="lado-fora"
+                              style={{ width: `${(b / total) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        <span className="estat-valor">
+                          {b}
+                          {pct ? "%" : ""}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="discreto" style={{ marginBottom: 0 }}>
+                  À esquerda o que o time fez, à direita o que fizeram contra
+                  ele. <strong>Pontaria</strong> é chute no gol sobre chute
+                  total; <strong>conversão</strong> é gol sobre chute no gol —
+                  as duas somam a temporada inteira antes de dividir, então um
+                  jogo de 2 chutes não pesa igual a um de 20.
+                </p>
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ------------------------------- contra cada faixa da tabela */}
+      <div className="cartao">
+        <h2>Contra cada faixa da tabela</h2>
+        <p className="discreto">
+          Duas campanhas com os mesmos pontos podem ter origens opostas: ganhar
+          de quem está embaixo não é o mesmo que pontuar contra quem briga em
+          cima. Diferente das outras análises desta página,{" "}
+          <strong>esta cobre todos os jogos</strong> — sai do placar, não da
+          extração por partida. Só a fase de pontos corridos entra, então copa
+          não aparece.
+        </p>
+
+        {(forca?.length ?? 0) === 0 ? (
+          <p className="discreto" style={{ marginBottom: 0 }}>
+            Sem competição de pontos corridos na base para este time.
+          </p>
+        ) : (
+          porCompeticao(forca ?? []).map(([chaveGrupo, faixas]) => (
+            <div key={chaveGrupo} style={{ marginBottom: "1.4rem" }}>
+              <h3 style={{ margin: "0 0 0.6rem", fontSize: "0.95rem" }}>
+                {faixas[0].season} · {faixas[0].league_nome}{" "}
+                <span className="discreto" style={{ fontWeight: 400 }}>
+                  — {faixas[0].times_na_competicao} times na tabela
+                </span>
+              </h3>
+              <div className="tabela-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Faixa do adversário</th>
+                      <th className="num">J</th>
+                      <th className="num">V</th>
+                      <th className="num">E</th>
+                      <th className="num">D</th>
+                      <th className="num">Pts</th>
+                      <th className="num">Gols</th>
+                      <th className="num">Aprov.</th>
+                      <th style={{ width: "22%" }}></th>
+                      <th className="num">Pos. média</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {faixas.map((f) => (
+                      <tr key={f.faixa_adversario}>
+                        <td>
+                          {f.faixa_rotulo}{" "}
+                          <span className="discreto">
+                            ({f.times_na_faixa} times)
+                          </span>
+                        </td>
+                        <td className="num discreto">{f.jogos}</td>
+                        <td className="num">{f.vitorias}</td>
+                        <td className="num">{f.empates}</td>
+                        <td className="num">{f.derrotas}</td>
+                        <td className="num">
+                          <strong>{f.pontos}</strong>
+                        </td>
+                        <td className="num discreto">
+                          {f.gols_pro}:{f.gols_contra}
+                        </td>
+                        <td className="num">
+                          <span
+                            className={`nota ${f.aproveitamento_pct >= 50 ? "boa" : f.aproveitamento_pct < 33 ? "ruim" : ""}`}
+                          >
+                            {f.aproveitamento_pct}%
+                          </span>
+                        </td>
+                        <td>
+                          <div className="estat-barra">
+                            <div
+                              className="lado-casa"
+                              style={{ width: `${f.aproveitamento_pct}%` }}
+                            />
+                          </div>
+                        </td>
+                        <td className="num discreto">
+                          {f.posicao_media_adversario}º
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))
+        )}
+        <p className="discreto" style={{ marginBottom: 0 }}>
+          As faixas são quartis da classificação final, e não "G4" ou "zona de
+          rebaixamento": quem classifica e quem cai muda por competição e por
+          ano. <strong>Pos. média</strong> desempata a leitura — enfrentar o
+          1º quarto não é a mesma coisa se foi o campeão ou o quinto colocado.
+        </p>
+      </div>
+
+      {/* ---------------------------------------------- formações */}
+      <div className="cartao">
+        <h2>Formações</h2>
+        <p className="discreto">
+          Com qual desenho o time entrou e o que colheu com cada um. Vem da
+          escalação, então cobre só os jogos já extraídos.
+        </p>
+
+        <div className="linha" style={{ margin: "1rem 0" }}>
+          <label className="discreto">
+            Mínimo de jogos{" "}
+            <select
+              value={minJogosFormacao}
+              onChange={(e) => setMinJogosFormacao(Number(e.target.value))}
+            >
+              <option value={1}>1</option>
+              <option value={2}>2</option>
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+            </select>
+          </label>
+          <span className="discreto">
+            {formacoes?.length ?? 0} formações
+          </span>
+        </div>
+
+        {(formacoes?.length ?? 0) === 0 ? (
+          <p className="discreto" style={{ marginBottom: 0 }}>
+            Nenhuma formação com esse mínimo de jogos.
+          </p>
+        ) : (
+          <>
+            <div className="tabela-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Formação</th>
+                    <th>Temporada</th>
+                    <th>Competição</th>
+                    <th className="num">J</th>
+                    <th className="num">V</th>
+                    <th className="num">E</th>
+                    <th className="num">D</th>
+                    <th className="num">Aprov.</th>
+                    <th className="num">Gols/j</th>
+                    <th className="num">Sofridos/j</th>
+                    <th className="num">Sem sofrer</th>
+                    <th>Técnico</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formacoes?.map((f) => (
+                    <tr key={`${f.season}-${f.league_id}-${f.formacao}`}>
+                      <td>
+                        <span className="faixa">{f.formacao}</span>
+                      </td>
+                      <td className="discreto">{f.season}</td>
+                      <td className="discreto">{f.league_nome}</td>
+                      <td className="num">
+                        <strong>{f.jogos}</strong>
+                      </td>
+                      <td className="num">{f.vitorias}</td>
+                      <td className="num">{f.empates}</td>
+                      <td className="num">{f.derrotas}</td>
+                      <td className="num">
+                        {/* com 1 ou 2 jogos o percentual nao significa nada,
+                            entao ele perde a cor que sugere julgamento */}
+                        <span
+                          className={`nota ${f.jogos < 3 ? "" : f.aproveitamento_pct >= 50 ? "boa" : f.aproveitamento_pct < 33 ? "ruim" : ""}`}
+                        >
+                          {f.aproveitamento_pct}%
+                        </span>
+                      </td>
+                      <td className="num discreto">{f.gols_por_jogo}</td>
+                      <td className="num discreto">{f.gols_sofridos_por_jogo}</td>
+                      <td className="num">{f.jogos_sem_sofrer_gol}</td>
+                      <td className="discreto">{f.tecnicos ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="discreto" style={{ marginBottom: 0 }}>
+              Leia a coluna <strong>J</strong> antes do aproveitamento: 100% com
+              uma partida é uma partida, não uma tendência — por isso o
+              percentual só ganha cor a partir de três jogos.
             </p>
           </>
         )}

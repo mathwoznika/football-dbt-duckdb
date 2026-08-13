@@ -565,3 +565,146 @@ class LinhaClassificacao(BaseModel):
         description="Resultados dos 5 ultimos jogos em ordem cronologica: o "
         "primeiro caractere e o mais antigo, o ultimo e o jogo mais recente.",
     )
+
+
+class EstatisticaDaTemporada(BaseModel):
+    """Perfil estatistico coletivo de um time numa competicao e temporada.
+
+    COBERTURA PARCIAL, e o campo que diz isso e obrigatorio de ler. A onda 3 so
+    alcancou parte dos jogos, e como o endpoint da API-Football devolve os dois
+    times de cada partida, um adversario do Coritiba pode aparecer aqui com uma
+    partida so. `jogos_com_estatistica` e `cobertura_pct` existem para a tela
+    poder dizer de quantos jogos o numero saiu — e para quem consome poder
+    exigir amostra minima.
+
+    As taxas (pontaria, conversao) sao calculadas sobre os totais da temporada,
+    nao como media das razoes de cada jogo.
+    """
+
+    league_id: int
+    league_nome: str
+    season: int
+    jogos_com_estatistica: int
+    jogos_na_competicao: int = Field(
+        description="Jogos disputados na competicao, com estatistica ou sem"
+    )
+    cobertura_pct: float
+
+    pontos: int
+    gols_pro: int
+    gols_contra: int
+    pontos_por_jogo: float | None = None
+
+    # com a bola
+    posse_media_pct: float | None = None
+    passes_por_jogo: float | None = None
+    precisao_passe_media_pct: float | None = None
+
+    # producao ofensiva
+    chutes_por_jogo: float | None = None
+    chutes_no_gol_por_jogo: float | None = None
+    chutes_na_area_por_jogo: float | None = None
+    escanteios_por_jogo: float | None = None
+    impedimentos_por_jogo: float | None = None
+    pontaria_pct: float | None = Field(
+        default=None, description="Chutes no gol sobre chutes totais"
+    )
+    conversao_pct: float | None = Field(
+        default=None, description="Gols sobre chutes no gol"
+    )
+    chutes_por_gol: float | None = Field(
+        default=None, description="Nulo quando o time nao marcou na amostra"
+    )
+
+    # o que o adversario produziu
+    chutes_sofridos_por_jogo: float | None = None
+    chutes_no_gol_sofridos_por_jogo: float | None = None
+    chutes_na_area_sofridos_por_jogo: float | None = None
+    escanteios_sofridos_por_jogo: float | None = None
+    defesas_goleiro_por_jogo: float | None = None
+    pontaria_adversario_pct: float | None = None
+    conversao_sofrida_pct: float | None = None
+
+    # disciplina
+    faltas_por_jogo: float | None = None
+    faltas_sofridas_por_jogo: float | None = None
+    amarelos_por_jogo: float | None = None
+    amarelos: int | None = None
+    vermelhos: int | None = None
+
+    primeiro_jogo: date
+    ultimo_jogo: date
+
+
+class FormacaoDoTime(BaseModel):
+    """Aproveitamento do time com cada desenho tatico.
+
+    AMOSTRA: depende da escalacao, logo da onda 3. Uma formacao com `jogos` = 1
+    e uma partida, nao uma tendencia — a tela precisa mostrar `jogos` ao lado de
+    qualquer aproveitamento daqui.
+    """
+
+    league_id: int
+    league_nome: str
+    season: int
+    formacao: str
+    jogos: int
+    vitorias: int
+    empates: int
+    derrotas: int
+    pontos: int
+    aproveitamento_pct: float
+    gols_pro: int
+    gols_contra: int
+    saldo: int
+    gols_por_jogo: float
+    gols_sofridos_por_jogo: float
+    jogos_sem_sofrer_gol: int
+    jogos_casa: int
+    jogos_fora: int
+    tecnicos: str | None = Field(
+        default=None, description="Quem escalou assim, separado por virgula"
+    )
+    primeiro_jogo: date
+    ultimo_jogo: date
+
+
+class DesempenhoPorForcaAdversario(BaseModel):
+    """Aproveitamento do time contra cada quarto da tabela.
+
+    NAO depende da onda 3: sai do placar de todos os jogos, entao vale para
+    qualquer time da base sem ressalva de amostra.
+
+    A faixa e um quartil da classificacao final, o que funciona igual numa
+    competicao de 20 times e numa de 12 — por isso `times_na_competicao` vem
+    junto, para a tela poder dizer quantos clubes cabem em cada quarto. So a
+    fase de pontos corridos entra na conta.
+    """
+
+    league_id: int
+    league_nome: str
+    season: int
+    faixa_adversario: int = Field(description="1 a 4, do topo para o fim da tabela")
+    faixa_rotulo: str
+    times_na_competicao: int
+    times_na_faixa: int = Field(
+        description="Quantos clubes couberam nesta faixa. Vem do model e nao de "
+        "uma divisao por 4, porque numa competicao de 18 times o quartil produz "
+        "faixas de tamanhos diferentes."
+    )
+    jogos: int
+    vitorias: int
+    empates: int
+    derrotas: int
+    pontos: int
+    aproveitamento_pct: float
+    gols_pro: int
+    gols_contra: int
+    saldo: int
+    jogos_casa: int
+    pontos_casa: int | None = None
+    jogos_fora: int
+    pontos_fora: int | None = None
+    posicao_media_adversario: float = Field(
+        description="Posicao media de quem ele enfrentou dentro da faixa"
+    )
