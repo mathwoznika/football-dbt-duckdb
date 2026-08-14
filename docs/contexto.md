@@ -39,6 +39,69 @@ requisições. Mas o placar de todos eles custou 9 (`fixtures` por liga-temporad
 É isso que dá contexto de adversário — para prever Coritiba × Santos você precisa
 da forma do Santos contra todo mundo, não só contra o Coritiba.
 
+## O escopo é declarativo porque ele vai mudar
+
+O objetivo final não é o Coritiba: é o futebol brasileiro inteiro, incluindo
+Libertadores e Sul-Americana. O recorte num clube é uma **consequência da cota**,
+não do interesse — 100 requisições por dia não comportam outra coisa.
+
+Por isso `extrair.py` separa o *escopo* do *mecanismo*. O bloco `ESCOPO` tem dois
+modos:
+
+| modo | semente | quando |
+|---|---|---|
+| `time` | o calendário de um clube | hoje, no Free |
+| `ligas` | uma lista explícita de competições | no plano pago |
+
+E `profundidade` controla o alcance da onda 3, que é a parte cara: `semente` só
+os jogos do clube (~670 chamadas), `tudo` todos os jogos de todas as ligas do
+escopo (~7.000 para os 9 pares atuais).
+
+O resto do arquivo não muda entre os dois modos, porque as ondas 2 e 3 já
+trabalham sobre o conjunto de pares (liga, temporada) — independentemente de
+como esse conjunto apareceu. Virar a chave é editar três linhas, não reescrever
+o extrator.
+
+**O ritmo também é do plano, e isso não é detalhe.** O intervalo entre chamadas
+era fixo em 6,5s, dimensionado para as 10 por minuto do Free. No plano pago,
+7.000 chamadas nesse ritmo levariam **12,8 horas**; a 300 por minuto, 26
+minutos. O `definir_ritmo()` deriva o intervalo do limite do plano.
+
+## Vazio não é o mesmo que faltando
+
+Requisição que volta sem nada custa igual a uma que traz dado, e o arquivo vazio
+gravado impede tentar de novo — o que é proposital, mas só quando o vazio é
+definitivo.
+
+O `SEM_DADO` lista os pares (dataset, liga) que a fonte não cobre. Ele foi
+montado com evidência, não com suposição: `python extrair.py --diagnostico` lê
+`data/raw` e mostra onde tudo que já foi extraído voltou vazio. O Paranaense
+apareceu com 24 arquivos de estatística e 23 de jogadores, todos sem uma linha,
+enquanto evento e escalação vieram normalmente nos mesmos jogos.
+
+Ganho: a fila caiu de 243 para 200 pendências — 43 requisições que iam voltar
+vazias, 18% do que restava.
+
+**Mas vazio nem sempre é desperdício.** Copa não tem tabela de classificação,
+então `standings` vazio na Copa do Brasil é a resposta certa, e custou 1
+requisição por liga-temporada em vez de 1 por jogo. Por isso o diagnóstico só
+sugere `SEM_DADO` para os quatro datasets por jogo, que são onde o desperdício
+se acumula. A leitura continua sendo humana; a ferramenta só mostra o número.
+
+Esse comando vai ser o primeiro a rodar quando o plano pago abrir Libertadores e
+Sul-Americana, competições de cobertura desconhecida para nós.
+
+## A ordem da fila vale meio dia
+
+A fila era montada por id de liga, o que colocava a **Série B 2024 inteira — uma
+temporada ainda intocada, 152 requisições — atrás de 86 pedidos do estadual**,
+dos quais metade voltaria vazia. `PRIORIDADE_LIGA` inverte isso: competição mais
+informativa primeiro, e o que não está na lista vai para o fim.
+
+Os quatro endpoints do mesmo jogo continuam saindo juntos, de propósito: um jogo
+completo vale mais que quatro jogos pela metade, porque as telas só acendem
+quando o jogo fecha.
+
 ## Layout do raw
 
 ```
@@ -128,20 +191,16 @@ dia 01, com `fim` nulo em passagens já encerradas e meses inteiros sem ninguém
 Use `bronze_fixture_lineups`, que diz quem estava no banco naquele jogo. Regra
 geral: prefira a fonte que é subproduto do fato à que é cadastro.
 
-**O Paranaense é raso na API, e isso muda o valor da cota.** Para a liga 606 os
-endpoints `fixture_statistics` e `fixture_players` voltam **vazios** — 17 de 17
-arquivos extraídos, nenhuma linha — e o lineup vem sem `grid`, então não há
-campinho posicionado. Só eventos e nomes de escalação existem. A Copa do Brasil
-vem pela metade: 2 dos 4 jogos de 2022 têm estatística.
+**O Paranaense é raso na API.** Para a liga 606 os endpoints
+`fixture_statistics` e `fixture_players` voltam **vazios** — 24 e 23 arquivos
+extraídos, nenhuma linha — e o lineup vem sem `grid`, então não há campinho
+posicionado. Só eventos e nomes de escalação existem. A Copa do Brasil vem pela
+metade: 3 de 8 jogos sem estatística, 6 de 8 sem dado de jogador.
 
-A consequência é de planejamento, não de modelagem: dos 338 pedidos que faltam,
-**56 são esses dois endpoints para os 28 jogos restantes do estadual**, e vão
-voltar vazios. Pular a liga 606 neles no `extrair.py` liberaria mais de meio dia
-de cota para a Série B 2024, que está inteiramente por extrair. Não foi feito —
-decisão consciente de não mexer no extrator agora —, mas quem for otimizar a
-fila começa por aqui.
-
-Nada disso é bug do pipeline: os arquivos crus estão vazios em `data/raw`.
+Nada disso é bug do pipeline: os arquivos crus estão vazios em `data/raw`. Os
+dois pares do estadual estão em `SEM_DADO` e a fila os pula — ver *Vazio não é o
+mesmo que faltando*. A Copa do Brasil **não** entra na lista: lá o vazio é
+parcial, e pular perderia os jogos que têm dado.
 
 **Artilharia não é derivável da nossa base.** A onda 3 cobre só os jogos do
 Coritiba, então gols em Palmeiras × Flamengo não existem aqui. O
@@ -327,7 +386,7 @@ Esta lista já esteve duplicada — Dagster e Postgres apareciam duas vezes, em
 ordens contrárias, resíduo de duas edições. Foi consolidada; se ela voltar a ter
 o mesmo item em dois lugares, o de baixo é o antigo.
 
-1. **Terminar a onda 3** — 338 requisições, uns 3,5 dias. É o que mais entrega
+1. **Terminar a onda 3** — 200 requisições, umas 3 execuções. É o que mais entrega
    valor por requisição, então vem antes de qualquer extração nova. Quando
    fechar, as telas que hoje mostram cobertura parcial (momento dos gols,
    estatística de jogo, perfil estatístico, elenco) se completam sozinhas.

@@ -29,6 +29,9 @@ docs/contexto.md   por que cada decisão foi tomada
 # extração — uma vez por dia até a fila zerar
 env/bin/python extrair.py
 
+# onde a cota foi gasta sem trazer nada (monta a lista SEM_DADO com evidência)
+env/bin/python extrair.py --diagnostico
+
 # transformação (models + testes, na ordem do DAG)
 cd transform && ../env/bin/dbt build
 
@@ -86,6 +89,17 @@ um `api.py` na raiz.
 
 **Cota de 100 requisições/dia** no plano Free, e só as temporadas **2022 a 2024**.
 O extrator é idempotente: o que já está em `data/raw` é pulado sem gastar nada.
+O plano fica em `PLANOS` no `extrair.py` e governa temporadas, orçamento e ritmo
+de uma vez — trocar `PLANO = "free"` por `"pago"` é a única edição necessária.
+
+**Nunca grave uma resposta paginada pela metade.** Arquivo em disco significa
+"assunto encerrado" para o `ja_extraido`, então uma primeira página gravada faz
+o resto do dado nunca mais ser buscado, e o truncamento só aparece muito depois
+como um total que não fecha. O `apifootball.buscar` levanta `RespostaPaginada`
+em vez de devolver a página 1; quem precisa de várias páginas declara
+`paginado=True` na `Tarefa`. Hoje nenhum endpoint do escopo pagina — o caso
+conhecido é `/players?league&season` no plano pago, com ~30 páginas por
+liga-temporada.
 
 **Palavras reservadas no payload.** `end`, `group`, `all`, `for`, `in`, `on` e
 `time` são nomes de campo na API e precisam de aspas no SQL.
@@ -136,11 +150,12 @@ O mesmo cuidado vale para `time` (equipe vs. tempo) e `partida` (jogo vs. iníci
 
 ## Onde o projeto está
 
-**Extração:** onda 3 em 84 de 168 jogos, 338 tarefas pendentes, uns 3,5 dias a
-95 requisições/dia. Rodar `env/bin/python extrair.py` uma vez por dia até zerar.
-Tudo o mais (calendários, ligas, times, classificações, artilheiros, técnicos,
-transferências) já está extraído. Parte da fila vai voltar vazia — ver o
-Paranaense nas *Particularidades do dado* do `contexto.md`.
+**Extração:** onda 3 em 107 de 168 jogos, **200 tarefas pendentes**, umas 3
+execuções a 95 requisições/dia. Rodar `env/bin/python extrair.py` uma vez por dia
+até zerar. Série A 2022 e 2023 estão completas nos quatro datasets; a fila agora
+começa pela **Série B 2024**, que é a temporada ainda intocada. Tudo o mais
+(calendários, ligas, times, classificações, artilheiros, técnicos,
+transferências) já está extraído.
 
 **Pronto e no ar:** 40 models, 28 endpoints, 8 páginas — times, jogadores,
 jogo com campinho posicionado, competições com classificação/artilharia/

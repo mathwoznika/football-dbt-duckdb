@@ -22,13 +22,27 @@ CHAVE = os.getenv("API_FOOTBALL_KEY") or os.getenv("API-KEY")
 BASE = (os.getenv("API_FOOTBALL_URL") or os.getenv("URL") or "").rstrip("/")
 RAW = Path(__file__).resolve().parent / "data" / "raw"
 
-# O plano Free aceita 10 chamadas por minuto; 6.5s de intervalo deixa folga.
+# Intervalo entre chamadas, em segundos. O Free aceita 10 por minuto e 6.5s
+# deixa folga. Quem manda nisto e o extrair.py, via definir_ritmo() — no plano
+# pago manter 6.5s faria uma extracao de 7.000 chamadas levar treze horas.
 INTERVALO = 6.5
 
 # Quanto ainda resta da cota diaria, segundo o header da ultima resposta.
 cota_restante = None
 
+# Quantas chamadas HTTP sairam daqui nesta execucao. O extrair.py conta o
+# orcamento por este numero e nao por tarefa concluida, porque uma tarefa
+# paginada gasta varias requisicoes.
+chamadas = 0
+
 _ultima_chamada = 0.0
+
+
+def definir_ritmo(por_minuto):
+    """Ajusta o intervalo entre chamadas ao limite do plano, com 10% de folga."""
+    global INTERVALO
+    if por_minuto and por_minuto > 0:
+        INTERVALO = (60.0 / por_minuto) * 1.1
 
 
 class RecusadoPelaAPI(Exception):
@@ -38,13 +52,65 @@ class RecusadoPelaAPI(Exception):
     """
 
 
-def buscar(endpoint, params):
+class RespostaPaginada(Exception):
+    """A resposta tem mais de uma pagina e o chamador nao pediu paginacao.
+
+    Existe para transformar perda silenciosa em erro alto. Gravar so a primeira
+    pagina seria pior que falhar: `ja_extraido` trata arquivo em disco como
+    assunto encerrado, entao o resto do dado nunca mais seria buscado — e o
+    truncamento so apareceria muito depois, como um total que nao fecha.
+
+    Hoje nenhum endpoint do escopo pagina (476 arquivos, todos com
+    paging.total = 1). O caso conhecido que vai paginar e /players?league&season
+    no plano pago, com ~30 paginas por liga-temporada.
+    """
+
+
+def buscar(endpoint, params, paginado=False):
     """Chama a API e devolve o JSON exatamente como veio.
 
     Cuida sozinho do intervalo entre chamadas e de tentar de novo quando o
     problema e passageiro (429 ou erro do servidor).
+
+    Com paginado=False (o padrao) uma resposta de varias paginas levanta
+    RespostaPaginada em vez de devolver a primeira — ver a classe para o porque.
+    Com paginado=True as paginas sao lidas em sequencia e concatenadas; o
+    envelope guarda quantas foram, para a gravacao continuar auditavel.
     """
-    global _ultima_chamada, cota_restante
+    if paginado:
+        return _buscar_paginas(endpoint, params)
+    return _buscar_pagina(endpoint, params)
+
+
+def _buscar_paginas(endpoint, params):
+    """Le todas as paginas e devolve um envelope com o response concatenado.
+
+    Concatenar e nao gravar uma pagina por arquivo mantem a promessa da casa —
+    nada e descartado — e deixa o dbt continuar lendo um arquivo por resposta
+    logica. `paging.lidas` registra o que foi juntado.
+    """
+    primeira = _buscar_pagina(endpoint, params, aceita_paginas=True)
+    total = (primeira.get("paging") or {}).get("total") or 1
+    if total <= 1:
+        return primeira
+
+    resposta = list(primeira.get("response") or [])
+    for pagina in range(2, total + 1):
+        seguinte = _buscar_pagina(
+            endpoint, {**params, "page": pagina}, aceita_paginas=True
+        )
+        resposta.extend(seguinte.get("response") or [])
+
+    return {
+        **primeira,
+        "response": resposta,
+        "results": len(resposta),
+        "paging": {**(primeira.get("paging") or {}), "lidas": total},
+    }
+
+
+def _buscar_pagina(endpoint, params, aceita_paginas=False):
+    global _ultima_chamada, cota_restante, chamadas
 
     for tentativa in range(3):
         espera = INTERVALO - (time.monotonic() - _ultima_chamada)
@@ -58,6 +124,7 @@ def buscar(endpoint, params):
             timeout=30,
         )
         _ultima_chamada = time.monotonic()
+        chamadas += 1
 
         if resposta.headers.get("x-ratelimit-requests-remaining"):
             cota_restante = resposta.headers["x-ratelimit-requests-remaining"]
@@ -93,6 +160,16 @@ def buscar(endpoint, params):
         erros = payload.get("errors")
         if isinstance(erros, dict) and erros:
             raise RecusadoPelaAPI("; ".join(f"{k}: {v}" for k, v in erros.items()))
+
+        # Truncamento silencioso morre aqui. Sem esta guarda, gravariamos a
+        # pagina 1 como se fosse a resposta inteira e o ja_extraido daria o
+        # assunto por encerrado para sempre.
+        total = (payload.get("paging") or {}).get("total") or 1
+        if total > 1 and not aceita_paginas:
+            raise RespostaPaginada(
+                f"{endpoint} devolveu {total} paginas e a tarefa nao pede "
+                f"paginacao — marque paginado=True em extrair.py"
+            )
 
         return payload
 
