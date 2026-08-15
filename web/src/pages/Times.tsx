@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { api } from "../api";
 import { useDados } from "../useDados";
@@ -12,8 +11,16 @@ import { useDados } from "../useDados";
  * numa base grande o certo seria esperar o usuario parar de digitar (debounce).
  */
 export default function Times() {
-  const [busca, setBusca] = useState("");
+  // A busca vive na URL, e nao num useState local. Assim o campo do cabecalho
+  // e o desta tela sao o mesmo estado, o resultado e compartilhavel por link e
+  // o botao voltar do navegador funciona sobre as buscas.
+  const [params, setParams] = useSearchParams();
+  const busca = params.get("busca") ?? "";
   const { dados: times, erro, carregando } = useDados(() => api.times(busca), [busca]);
+
+  function setBusca(valor: string) {
+    setParams(valor ? { busca: valor } : {}, { replace: true });
+  }
 
   return (
     <>

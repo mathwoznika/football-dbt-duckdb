@@ -403,12 +403,24 @@ export type Competicao = {
   league_id: number;
   league_nome: string;
   season: number;
+  tipo: string | null;
   times: number;
   jogos: number;
+  gols: number;
+  gols_por_jogo: number | null;
+  primeiro_jogo: string | null;
+  ultimo_jogo: string | null;
   campeao_id: number | null;
   campeao: string | null;
+  campeao_logo: string | null;
+  artilheiro: string | null;
+  artilheiro_gols: number | null;
   tem_chaveamento: boolean;
   tem_classificacao: boolean;
+  /** Quantos jogos já têm detalhe lance a lance. Zero em várias competições. */
+  jogos_com_evento: number;
+  jogos_com_estatistica: number;
+  cobertura_evento_pct: number | null;
 };
 
 export type PontoDaEvolucao = {
@@ -594,6 +606,77 @@ export type DesempenhoPorForcaAdversario = {
   posicao_media_adversario: number;
 };
 
+/** Um recorde da base: goleada, artilheiro, melhor campanha. */
+export type Destaque = {
+  tipo: string;
+  ordem: number;
+  rotulo: string;
+  valor: string;
+  detalhe: string;
+  league_nome: string;
+  season: number;
+  fixture_id: number | null;
+  time_id: number | null;
+  time_nome: string | null;
+  logo_url: string | null;
+};
+
+/** O tamanho da base inteira. Alimenta a home. */
+export type ResumoDaBase = {
+  jogos: number;
+  times: number;
+  competicoes: number;
+  competicoes_temporada: number;
+  primeira_temporada: number;
+  ultima_temporada: number;
+  gols: number;
+  gols_por_jogo: number | null;
+  jogadores: number;
+  lances: number;
+  /** Jogos com detalhe lance a lance — bem menos que o total, e a home diz isso. */
+  jogos_com_evento: number;
+  jogos_com_estatistica: number;
+};
+
+/**
+ * Cartoes numa faixa de 15 minutos. Mesmo eixo do GolsPorPeriodo, de proposito:
+ * as duas leituras ficam comparaveis lado a lado.
+ */
+export type CartaoNoPeriodo = {
+  faixa: string;
+  ordem_faixa: number;
+  tomados: number;
+  amarelos: number;
+  vermelhos: number;
+  /** Cartoes que o adversario tomou nas mesmas partidas. */
+  provocados: number;
+  /** Cobertura real: partidas com lance extraido, nao partidas com cartao nesta faixa. */
+  jogos_com_evento: number;
+};
+
+/**
+ * Disciplina e custo da expulsao. As colunas de expulsao saem de amostra
+ * pequena — leia `jogos_com_expulsao` e `minutos_com_um_a_menos` antes da taxa.
+ */
+export type Disciplina = {
+  league_id: number;
+  league_nome: string;
+  season: number;
+  jogos_com_evento: number;
+  amarelos: number;
+  vermelhos: number;
+  cartoes_por_jogo: number | null;
+  minuto_medio_primeiro_cartao: number | null;
+  cartoes_apos_75: number;
+  cartoes_do_adversario: number;
+  jogos_com_expulsao: number;
+  gols_sofridos_apos_expulsao: number;
+  minutos_com_um_a_menos: number | null;
+  /** Nulo quando o time nao teve expulsao na amostra. */
+  gols_sofridos_por_90_com_um_a_menos: number | null;
+  gols_sofridos_por_90_normal: number | null;
+};
+
 /**
  * De onde vem o gol marcado e o sofrido. Cobertura parcial — `jogos_com_evento`
  * diz sobre quantas partidas a conta foi feita.
@@ -772,6 +855,18 @@ export const api = {
     get<OrigemDosGols[]>(`/times/${team_id}/origem-dos-gols`),
 
   banco: (team_id: number) => get<ImpactoDoBanco[]>(`/times/${team_id}/banco`),
+
+  cartoesPorPeriodo: (team_id: number, season?: number, league_id?: number) =>
+    get<CartaoNoPeriodo[]>(
+      `/times/${team_id}/cartoes-por-periodo${query({ season, league_id })}`,
+    ),
+
+  disciplina: (team_id: number) =>
+    get<Disciplina[]>(`/times/${team_id}/disciplina`),
+
+  resumo: () => get<ResumoDaBase>("/resumo"),
+
+  destaques: () => get<Destaque[]>("/destaques"),
 
   competicoes: () => get<Competicao[]>("/competicoes"),
 

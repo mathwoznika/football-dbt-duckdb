@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { api } from "../api";
 import { useDados } from "../useDados";
+import { useLimiteDeLinhas } from "../components/LimiteDeLinhas";
 
 const POSICOES: Record<string, string> = {
   G: "Goleiro",
@@ -30,6 +31,8 @@ export default function Jogadores() {
     dados: jogadores,
     carregando,
   } = useDados(() => api.jogadores(busca, minJogos), [busca, minJogos]);
+
+  const lista = useLimiteDeLinhas(jogadores, 25);
 
   return (
     <>
@@ -92,7 +95,7 @@ export default function Jogadores() {
               </tr>
             </thead>
             <tbody>
-              {jogadores?.map((j) => (
+              {lista.visiveis.map((j) => (
                 <tr key={j.player_id}>
                   <td>
                     <Link to={`/jogadores/${j.player_id}`}>
@@ -146,6 +149,7 @@ export default function Jogadores() {
             </tbody>
           </table>
         </div>
+        {lista.controle}
       </div>
     </>
   );

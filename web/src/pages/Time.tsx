@@ -7,6 +7,7 @@ import Chaveamento from "../components/Chaveamento";
 import Artilheiros from "../components/Artilheiros";
 import Classificacao from "../components/Classificacao";
 import Metrica from "../components/Metrica";
+import { useLimiteDeLinhas } from "../components/LimiteDeLinhas";
 import { useDados } from "../useDados";
 
 /** Formata "2023-12-07" como "07/12/2023" sem depender de biblioteca. */
@@ -90,6 +91,17 @@ export default function TimePage() {
   // (o Paranaense tem fase de grupos e depois mata-mata).
   const temTabela = (tabela?.length ?? 0) > 0;
   const temChave = (chaveamento?.length ?? 0) > 0;
+
+  // Tabelas longas ganham limite de linhas. Sem isso, o elenco (60+), as
+  // transferencias (60+) e o retrospecto (100+) empilhavam varias telas de
+  // rolagem entre o visitante e o fim da pagina.
+  //
+  // Ficam ANTES do early return de erro de proposito: hook chamado dentro de um
+  // if roda em umas renderizacoes e nao em outras, e o React perde a conta de
+  // qual estado pertence a qual hook.
+  const elencoLimitado = useLimiteDeLinhas(elenco, 10);
+  const transferenciasLimitadas = useLimiteDeLinhas(transferencias, 10);
+  const confrontosLimitados = useLimiteDeLinhas(confrontos, 10);
 
   if (erroTime) {
     return (
@@ -413,7 +425,7 @@ export default function TimePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {elenco.map((j) => (
+                  {elencoLimitado.visiveis.map((j) => (
                     <tr key={j.player_id}>
                       <td>
                         <Link to={`/jogadores/${j.player_id}`}>
@@ -477,6 +489,7 @@ export default function TimePage() {
                 </tbody>
               </table>
             </div>
+            {elencoLimitado.controle}
             <p className="discreto" style={{ marginBottom: 0 }}>
               Só jogos com estatística já extraída. Clique no nome para o perfil
               completo.
@@ -515,7 +528,7 @@ export default function TimePage() {
                 </tr>
               </thead>
               <tbody>
-                {transferencias?.map((t) => (
+                {transferenciasLimitadas.visiveis.map((t) => (
                   <tr key={`${t.player_id}-${t.data}-${t.team_destino_id}`}>
                     <td className="discreto">{dataBr(t.data)}</td>
                     <td>{t.sentido === "chegou" ? "↓" : "↑"}</td>
@@ -535,6 +548,7 @@ export default function TimePage() {
               </tbody>
             </table>
           </div>
+          {transferenciasLimitadas.controle}
         </details>
       )}
 
@@ -560,7 +574,7 @@ export default function TimePage() {
               </tr>
             </thead>
             <tbody>
-              {confrontos?.map((c) => (
+              {confrontosLimitados.visiveis.map((c) => (
                 <tr key={c.adversario_id}>
                   <td>
                     <Link to={`/times/${c.adversario_id}`}>{c.adversario_nome}</Link>
@@ -579,6 +593,7 @@ export default function TimePage() {
             </tbody>
           </table>
         </div>
+        {confrontosLimitados.controle}
       </details>
     </>
   );

@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import Metrica from "../components/Metrica";
 import { useDados } from "../useDados";
+import { useLimiteDeLinhas } from "../components/LimiteDeLinhas";
 
 function dataBr(iso: string) {
   const [ano, mes, dia] = iso.split("-");
@@ -43,6 +44,12 @@ export default function JogadorPage() {
     (t) => t.season === season && t.league_id === leagueId,
   );
   const identidade = temporadas?.[0];
+
+  // Antes do early return de erro: hook chamado condicionalmente roda em umas
+  // renderizacoes e nao em outras, e o React perde a conta de qual estado
+  // pertence a qual hook. O TypeScript nao pega isso — quebra so em execucao,
+  // e so quando o jogador nao tem dado.
+  const jogoAJogo = useLimiteDeLinhas(jogos, 10);
 
   if (erro) {
     return (
@@ -135,7 +142,7 @@ export default function JogadorPage() {
               </tr>
             </thead>
             <tbody>
-              {jogos?.map((j) => (
+              {jogoAJogo.visiveis.map((j) => (
                 <tr key={j.fixture_id}>
                   <td className="discreto">
                     <Link to={`/jogos/${j.fixture_id}`}>{dataBr(j.data)}</Link>
@@ -173,6 +180,7 @@ export default function JogadorPage() {
             </tbody>
           </table>
         </div>
+        {jogoAJogo.controle}
         <p className="discreto" style={{ marginBottom: 0 }}>
           ↑ entrou durante a partida. Só aparecem jogos com estatística já extraída.
         </p>

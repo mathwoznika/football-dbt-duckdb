@@ -428,6 +428,54 @@ models:
         description: Gols de quem estava entre os reservas e entrou durante o jogo.
         tests: [not_null]
 
+  - name: gold_cartao_momento
+    description: >
+      Quando o time toma e provoca cartao, em faixas de 15 minutos. Espelha o
+      gold_gols_por_periodo ate nos nomes das faixas, para as duas telas ficarem
+      comparaveis lado a lado.
+
+      O dado tem sinal forte: na base inteira a ultima faixa concentra 206 dos
+      684 amarelos e 13 dos 29 vermelhos, contra 45 amarelos nos primeiros
+      quinze minutos.
+
+      `provocados` sao os cartoes que o adversario tomou na mesma partida — e o
+      contraste que falta para ler o proprio numero, ja que jogo truncado
+      castiga os dois lados.
+    columns:
+      - name: time_id
+        tests: [not_null]
+      - name: ordem_faixa
+        tests: [not_null]
+      - name: jogos_com_evento
+        description: >
+          Partidas do time com lance extraido, INDEPENDENTE de ter havido cartao
+          na faixa. Calculada fora do grupo de proposito: contar dentro do grupo
+          responde outra pergunta e subestima a cobertura — foi exatamente o bug
+          que fazia a tela anunciar 13 de 38 numa temporada completa.
+        tests: [not_null]
+
+  - name: gold_disciplina
+    description: >
+      Disciplina por temporada e o custo da expulsao. A coluna que justifica o
+      model e gols_sofridos_por_90_com_um_a_menos: a contagem crua de gols apos
+      expulsao nao e comparavel com nada, porque uma vermelha aos 30 custa o
+      triplo de uma aos 80. Normalizada por minuto, ela pode ser lida contra
+      gols_sofridos_por_90_normal.
+
+      APROXIMACAO: os minutos em desvantagem sao 90 menos o minuto da expulsao,
+      ignorando acrescimo — a taxa sai levemente superestimada.
+
+      AMOSTRA PEQUENA. O Coritiba tem 21 expulsoes em 19 jogos somando tudo; por
+      temporada vira meia duzia. Leia jogos_com_expulsao e minutos_com_um_a_menos
+      antes da taxa: na Serie B 2024 ela sai de 2 gols em 56 minutos.
+    columns:
+      - name: time_id
+        tests: [not_null]
+      - name: jogos_com_evento
+        tests: [not_null]
+      - name: jogos_com_expulsao
+        tests: [not_null]
+
   - name: gold_desempenho_por_forca_adversario
     description: >
       Aproveitamento do time contra cada quarto da tabela. Nao depende da onda

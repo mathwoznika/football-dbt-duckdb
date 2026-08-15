@@ -56,14 +56,175 @@ a:hover {
 
 /* ---------------------------------------------------------- estrutura */
 
+/*
+ * Cabecalho fixo. Antes era uma fileira de links separados por ponto, sem marca
+ * e sem indicar a tela atual — o <NavLink> agora aplica .active sozinho e a
+ * navegacao passa a responder "onde eu estou", nao so "para onde posso ir".
+ */
 .topo {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   border-bottom: 1px solid var(--borda);
-  background: var(--fundo-2);
-  padding: 0.9rem 1.5rem;
+  background: color-mix(in srgb, var(--fundo) 88%, transparent);
+  backdrop-filter: blur(10px);
 }
 
-.topo strong {
+.topo-faixa {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 0.7rem 1.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
+}
+
+.marca:hover {
+  text-decoration: none;
+}
+
+.marca strong {
   color: var(--destaque);
+}
+
+/* a marca grafica e um circulo, nao um emoji: escala com a fonte e acompanha o
+   tema sem depender de suporte a emoji do sistema */
+.marca-bola {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2.5px solid var(--destaque);
+  flex-shrink: 0;
+}
+
+/*
+ * Faixa da navegacao, ancorada na esquerda como a marca acima dela.
+ *
+ * O overflow horizontal e a solucao de escala: com o dobro de itens a faixa
+ * rola em vez de quebrar em duas linhas ou virar menu sanduiche. `scrollbar-
+ * width: none` esconde a barra, que num menu de uma linha e mais feia que util
+ * — o corte no ultimo item ja sinaliza que ha mais.
+ */
+.menu {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 0.35rem 1.5rem 0.5rem;
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.menu::-webkit-scrollbar {
+  display: none;
+}
+
+.menu a {
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--texto-2);
+  white-space: nowrap;
+}
+
+.menu a:hover {
+  background: var(--fundo-2);
+  color: var(--texto);
+  text-decoration: none;
+}
+
+.menu a.active {
+  background: color-mix(in srgb, var(--destaque) 14%, transparent);
+  color: var(--destaque);
+  font-weight: 600;
+}
+
+.busca {
+  position: relative;
+  flex: 1;
+  max-width: 380px;
+  margin: 0 auto;
+}
+
+.busca input {
+  width: 100%;
+}
+
+/*
+ * A lista flutua sobre o conteudo em vez de empurra-lo: um dropdown que desloca
+ * a pagina faz o texto pular embaixo do cursor a cada tecla digitada.
+ */
+.busca-lista {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: var(--fundo);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  overflow: hidden;
+}
+
+/*
+ * Cada resultado e um <button> e nao um <a>: a navegacao acontece por codigo,
+ * e botao ja vem com foco e Enter de graca no teclado.
+ */
+.busca-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.busca-item:hover,
+.busca-item:focus-visible {
+  background: var(--fundo-2);
+}
+
+.busca-nome {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.busca-item .discreto {
+  margin-left: auto;
+  font-size: 0.76rem;
+}
+
+.busca-vazio {
+  padding: 0.6rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+  .topo-faixa {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .busca {
+    max-width: none;
+    width: 100%;
+    margin-left: 0;
+  }
 }
 
 .conteudo {
@@ -1001,4 +1162,341 @@ tr.destacada td {
 select.compacto {
   font-size: 0.82rem;
   padding: 0.25rem 0.45rem;
+}
+
+/* ----------------------------------------------------------- glossário */
+
+/*
+ * Cabeçalho de coluna que se explica. O pontilhado é o sinal de "passe o mouse
+ * aqui" — o mesmo idioma do <abbr> do HTML, que o leitor já conhece sem
+ * precisar aprender.
+ */
+.termo {
+  border-bottom: 1px dotted var(--texto-2);
+  cursor: help;
+}
+
+/*
+ * A legenda vem fechada. Aberta por padrão, ela empurraria a tabela para baixo
+ * em toda tela e viraria ruído para quem já conhece as métricas; fechada, ela é
+ * uma promessa visível de que a explicação existe.
+ */
+.glossario {
+  margin-top: 0.9rem;
+  border-top: 1px solid var(--borda);
+  padding-top: 0.6rem;
+}
+
+.glossario > summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--texto-2);
+}
+
+.glossario dl {
+  margin: 0.8rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.9rem;
+}
+
+.glossario dt {
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.glossario dd {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--texto-2);
+  line-height: 1.45;
+}
+
+.glossario-formula {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.76rem;
+  color: var(--destaque);
+}
+
+/* o alerta de leitura é o que a nota de rodapé escondia — aqui ele tem cor */
+.glossario-cuidado {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--empate);
+}
+
+/* --------------------------------------------------------------- home */
+
+/*
+ * A capa nao usa .cartao: uma borda em volta do titulo principal deixa a pagina
+ * parecendo um formulario. Aqui o texto respira direto sobre o fundo.
+ */
+.capa {
+  padding: 2.2rem 0 1.8rem;
+  border-bottom: 1px solid var(--borda);
+  margin-bottom: 2rem;
+}
+
+.capa h1 {
+  margin: 0 0 0.6rem;
+  font-size: clamp(1.9rem, 4.5vw, 2.8rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+}
+
+.capa h1 em {
+  font-style: normal;
+  color: var(--destaque);
+}
+
+.capa-linha {
+  margin: 0 0 1rem;
+  font-size: 1.02rem;
+  line-height: 1.55;
+  color: var(--texto-2);
+  max-width: 60ch;
+}
+
+.capa-escala {
+  font-size: 0.84rem;
+}
+
+.secao-titulo {
+  margin: 0 0 0.9rem;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+
+section {
+  margin-bottom: 2.2rem;
+}
+
+/* ------------------------------------------------------------ recordes */
+
+.destaques {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 0.8rem;
+}
+
+.destaque {
+  display: block;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  background: var(--fundo-2);
+}
+
+a.destaque:hover {
+  border-color: var(--destaque);
+  text-decoration: none;
+}
+
+.destaque-rotulo {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--texto-2);
+}
+
+/* o numero e a manchete: e a primeira coisa que o olho pega no card */
+.destaque-valor {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  margin: 0.15rem 0 0.35rem;
+  color: var(--destaque);
+}
+
+.destaque-detalhe {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.destaque-onde {
+  margin-top: 0.35rem;
+  font-size: 0.76rem;
+}
+
+/* ------------------------------------------------------------ campeões */
+
+.campeoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 0.8rem;
+}
+
+.campeao-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+}
+
+.campeao-card:hover {
+  border-color: var(--destaque);
+  background: var(--fundo-2);
+  text-decoration: none;
+}
+
+.campeao-escudo img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.campeao-vazio {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--borda);
+}
+
+.campeao-corpo {
+  min-width: 0;
+}
+
+.campeao-nome {
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.campeao-torneio {
+  font-size: 0.84rem;
+  margin-top: 0.1rem;
+}
+
+.campeao-artilheiro {
+  font-size: 0.76rem;
+  margin-top: 0.25rem;
+}
+
+/*
+ * Selo do que EXISTE, nao do que falta. Uma competicao sem detalhe simplesmente
+ * nao mostra nada — avisar "0% de cobertura" em toda parte transforma a
+ * limitacao no assunto principal da tela.
+ */
+/*
+ * O selo mora no fluxo do card. Já foi absoluto, ancorado no canto, e sobre um
+ * nome longo — "Atletico Paranaense" — ele imprimia por cima do texto. Posição
+ * absoluta só é segura quando o conteúdo embaixo tem largura previsível, e nome
+ * de clube não tem.
+ */
+.selo {
+  display: inline-block;
+  margin-top: 0.4rem;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--destaque) 16%, transparent);
+  color: var(--destaque);
+}
+
+/* ------------------------------------------------------------- atalhos */
+
+.atalhos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.8rem;
+}
+
+.atalho {
+  display: block;
+  border: 1px solid var(--borda);
+  border-left: 3px solid var(--destaque);
+  border-radius: 10px;
+  padding: 0.9rem 1.1rem;
+}
+
+.atalho:hover {
+  background: var(--fundo-2);
+  text-decoration: none;
+}
+
+.atalho strong {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 1rem;
+}
+
+.atalho span {
+  display: block;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+/* ------------------------------------------------- limite de linhas */
+
+.limite-linhas {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  margin-top: 0.7rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--borda);
+  font-size: 0.8rem;
+}
+
+/* ----------------------------------------------------------------- abas */
+
+/*
+ * Barra de abas. Gruda logo abaixo do cabecalho fixo para continuar acessivel
+ * enquanto se rola uma secao longa — trocar de aba nao deveria exigir voltar ao
+ * topo. O `top` acompanha a altura do cabecalho de duas faixas.
+ */
+.abas {
+  position: sticky;
+  top: 84px;
+  z-index: 10;
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--fundo);
+  border-bottom: 1px solid var(--borda);
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.4rem;
+}
+
+.abas::-webkit-scrollbar {
+  display: none;
+}
+
+.aba {
+  border: 0;
+  background: transparent;
+  color: var(--texto-2);
+  font: inherit;
+  font-size: 0.92rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.aba:hover {
+  background: var(--fundo-2);
+  color: var(--texto);
+}
+
+/* a aba ativa ganha peso e cor, nao so fundo: o contraste sozinho some em tema
+   escuro para quem enxerga menos */
+.aba.ativa {
+  background: color-mix(in srgb, var(--destaque) 14%, transparent);
+  color: var(--destaque);
+  font-weight: 700;
 }

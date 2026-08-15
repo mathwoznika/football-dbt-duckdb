@@ -535,17 +535,76 @@ class ArbitroDoTime(BaseModel):
 
 
 class Competicao(BaseModel):
-    """Uma competicao numa temporada, para o indice."""
+    """Uma competicao numa temporada, para o indice e para a home.
+
+    `cobertura_evento_pct` e a fracao dos jogos que ja tem lance a lance
+    extraido. Sem ela, duas competicoes parecem igualmente detalhadas na tela
+    quando uma tem 100% e a outra 0%.
+    """
 
     league_id: int
     league_nome: str
     season: int
+    tipo: str | None = None
     times: int
     jogos: int
+    gols: int
+    gols_por_jogo: float | None = None
+    primeiro_jogo: date | None = None
+    ultimo_jogo: date | None = None
     campeao_id: int | None = None
     campeao: str | None = None
+    campeao_logo: str | None = None
+    artilheiro: str | None = None
+    artilheiro_gols: int | None = None
     tem_chaveamento: bool
     tem_classificacao: bool
+    jogos_com_evento: int
+    jogos_com_estatistica: int
+    cobertura_evento_pct: float | None = None
+
+
+class Destaque(BaseModel):
+    """Um fato que vale manchete: recorde, goleada, artilheiro.
+
+    Mart editorial — escolhe o que mostrar primeiro para quem chega. Os ids vem
+    junto para a tela virar link: destaque que nao da para clicar e numero solto.
+    """
+
+    tipo: str
+    ordem: int
+    rotulo: str
+    valor: str
+    detalhe: str
+    league_nome: str
+    season: int
+    fixture_id: int | None = None
+    time_id: int | None = None
+    time_nome: str | None = None
+    logo_url: str | None = None
+
+
+class ResumoDaBase(BaseModel):
+    """O tamanho da base inteira, para a home.
+
+    As duas ultimas colunas existem porque o projeto tem duas profundidades bem
+    diferentes: largura (placar de todos os jogos) e profundidade (lance a
+    lance, so onde a extracao por partida chegou). Mostrar 1.746 jogos sem dizer
+    que 132 tem lance levaria o visitante a confiar demais em metade das telas.
+    """
+
+    jogos: int
+    times: int
+    competicoes: int
+    competicoes_temporada: int
+    primeira_temporada: int
+    ultima_temporada: int
+    gols: int
+    gols_por_jogo: float | None = None
+    jogadores: int
+    lances: int
+    jogos_com_evento: int
+    jogos_com_estatistica: int
 
 
 class PontoDaEvolucao(BaseModel):
@@ -742,6 +801,57 @@ class DesempenhoPorForcaAdversario(BaseModel):
     posicao_media_adversario: float = Field(
         description="Posicao media de quem ele enfrentou dentro da faixa"
     )
+
+
+class CartaoNoPeriodo(BaseModel):
+    """Cartoes tomados e provocados numa faixa de 15 minutos.
+
+    Cobertura PARCIAL: vem dos lances por partida. `jogos_com_evento` e a
+    cobertura real da competicao — partidas com lance extraido, e nao partidas
+    que tiveram cartao nesta faixa.
+    """
+
+    faixa: str
+    ordem_faixa: int
+    tomados: int
+    amarelos: int
+    vermelhos: int
+    provocados: int = Field(
+        description="Cartoes que o adversario tomou nas mesmas partidas"
+    )
+    jogos_com_evento: int
+
+
+class Disciplina(BaseModel):
+    """Disciplina do time e o custo da expulsao, por competicao e temporada.
+
+    AMOSTRA PEQUENA nas colunas de expulsao. Leia `jogos_com_expulsao` e
+    `minutos_com_um_a_menos` antes da taxa: ela pode sair de dois jogos.
+
+    A taxa com um a menos usa minutos reais em desvantagem (90 menos o minuto
+    da vermelha, sem acrescimo), e existe para ser comparada com
+    `gols_sofridos_por_90_normal` — sozinha ela nao diz se e muito ou pouco.
+    """
+
+    league_id: int
+    league_nome: str
+    season: int
+    jogos_com_evento: int
+
+    amarelos: int
+    vermelhos: int
+    cartoes_por_jogo: float | None = None
+    minuto_medio_primeiro_cartao: float | None = None
+    cartoes_apos_75: int
+    cartoes_do_adversario: int
+
+    jogos_com_expulsao: int
+    gols_sofridos_apos_expulsao: int
+    minutos_com_um_a_menos: int | None = None
+    gols_sofridos_por_90_com_um_a_menos: float | None = Field(
+        default=None, description="Nulo quando o time nao teve expulsao na amostra"
+    )
+    gols_sofridos_por_90_normal: float | None = None
 
 
 class OrigemDosGols(BaseModel):

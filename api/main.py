@@ -17,11 +17,14 @@ from api.schemas import (
     Artilheiro,
     ArbitroDoTime,
     AtuacaoDoJogador,
+    CartaoNoPeriodo,
     Confronto,
     Competicao,
     ConfrontoEliminatorio,
     DesempenhoPorForcaAdversario,
     DesempenhoPorTempo,
+    Destaque,
+    Disciplina,
     EstatisticaDaPartida,
     EstatisticaDaTemporada,
     EventoDaPartida,
@@ -36,6 +39,7 @@ from api.schemas import (
     OrigemDosGols,
     Partida,
     PontoDaEvolucao,
+    ResumoDaBase,
     TecnicoDoTime,
     TemporadaDoTime,
     Time,
@@ -258,6 +262,55 @@ def estatisticas_da_temporada(
         order by season desc, jogos_com_estatistica desc
         """,
         [team_id, min_jogos],
+    )
+
+
+@app.get("/times/{team_id}/cartoes-por-periodo", response_model=list[CartaoNoPeriodo])
+def cartoes_por_periodo(
+    team_id: int,
+    season: int | None = Query(default=None),
+    league_id: int | None = Query(default=None),
+):
+    """Em que faixa de 15 minutos o time toma e provoca cartao.
+
+    Mesmo eixo do /gols-por-periodo, para as duas leituras serem comparaveis.
+    Cobertura parcial: vem dos lances por partida.
+    """
+    return consultar(
+        """
+        select faixa, ordem_faixa, tomados, amarelos, vermelhos, provocados,
+               jogos_com_evento
+        from gold_cartao_momento
+        where time_id = ?
+          and (? is null or season = ?)
+          and (? is null or league_id = ?)
+        order by ordem_faixa
+        """,
+        [team_id, season, season, league_id, league_id],
+    )
+
+
+@app.get("/times/{team_id}/disciplina", response_model=list[Disciplina])
+def disciplina(team_id: int):
+    """Cartoes por temporada e quanto a expulsao custa em gol sofrido.
+
+    A taxa com um a menos e normalizada por minuto em desvantagem, para poder
+    ser comparada com o ritmo normal do time. Leia jogos_com_expulsao antes: a
+    amostra por temporada costuma ser de meia duzia de jogos.
+    """
+    return consultar(
+        """
+        select league_id, league_nome, season, jogos_com_evento,
+               amarelos, vermelhos, cartoes_por_jogo,
+               minuto_medio_primeiro_cartao, cartoes_apos_75,
+               cartoes_do_adversario, jogos_com_expulsao,
+               gols_sofridos_apos_expulsao, minutos_com_um_a_menos,
+               gols_sofridos_por_90_com_um_a_menos, gols_sofridos_por_90_normal
+        from gold_disciplina
+        where time_id = ?
+        order by season desc, jogos_com_evento desc
+        """,
+        [team_id],
     )
 
 
@@ -691,47 +744,46 @@ def transferencias(
 # ---------------------------------------------------------- competicoes
 
 
-@app.get("/competicoes", response_model=list[Competicao])
-def listar_competicoes():
-    """Indice das competicoes-temporada presentes na base."""
+@app.get("/destaques", response_model=list[Destaque])
+def destaques():
+    """Recordes e fatos da base, na ordem em que devem aparecer na home."""
     return consultar(
         """
-        with jogos as (
-            select league_id, league_nome, season,
-                   count(distinct fixture_id) as jogos,
-                   count(distinct time_id)    as times
-            from silver_partida_time
-            group by all
-        ),
-        -- o campeao sai de lugares diferentes conforme o formato:
-        -- em mata-mata e quem venceu a final; em pontos corridos e o 1o
-        final as (
-            select league_id, season, vencedor_id
-            from gold_confronto_eliminatorio
-            where ordem_fase = 7
-        ),
-        lider as (
-            select league_id, season, time_id
-            from gold_classificacao
-            where posicao = 1
-        )
-        select jogos.league_id, jogos.league_nome, jogos.season,
-               jogos.times, jogos.jogos,
-               coalesce(final.vencedor_id, lider.time_id) as campeao_id,
-               time_campeao.team_nome as campeao,
-               final.vencedor_id is not null as tem_chaveamento,
-               exists (
-                   select 1 from gold_classificacao c
-                   where c.league_id = jogos.league_id and c.season = jogos.season
-               ) as tem_classificacao
-        from jogos
-        left join final
-               on final.league_id = jogos.league_id and final.season = jogos.season
-        left join lider
-               on lider.league_id = jogos.league_id and lider.season = jogos.season
-        left join silver_time as time_campeao
-               on time_campeao.team_id = coalesce(final.vencedor_id, lider.time_id)
-        order by jogos.season desc, jogos.jogos desc
+        select tipo, ordem, rotulo, valor, detalhe, league_nome, season,
+               fixture_id, time_id, time_nome, logo_url
+        from gold_destaque
+        order by ordem
+        """
+    )
+
+
+@app.get("/resumo", response_model=ResumoDaBase)
+def resumo_da_base():
+    """O tamanho da base inteira. Alimenta a home.
+
+    Le um mart de uma linha so — a soma acontece no dbt, nao aqui e nem na tela.
+    """
+    linhas = consultar("select * from gold_base_resumo")
+    return linhas[0]
+
+
+@app.get("/competicoes", response_model=list[Competicao])
+def listar_competicoes():
+    """Indice das competicoes-temporada presentes na base.
+
+    Este endpoint ja montou um CTE de trinta linhas aqui dentro. A logica virou
+    o gold_competicao, e o que sobrou e o que uma rota deve ser: selecionar e
+    ordenar.
+    """
+    return consultar(
+        """
+        select league_id, league_nome, season, tipo, times, jogos, gols,
+               gols_por_jogo, primeiro_jogo, ultimo_jogo,
+               campeao_id, campeao, campeao_logo, artilheiro, artilheiro_gols,
+               tem_chaveamento, tem_classificacao,
+               jogos_com_evento, jogos_com_estatistica, cobertura_evento_pct
+        from gold_competicao
+        order by season desc, jogos desc
         """
     )
 

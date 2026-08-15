@@ -360,6 +360,65 @@ Detalhe metodologico que vale manter: o script **quebra** se aparecer NaN nas
 features, em vez de imputar. Preencher com a mediana em silencio esconderia
 mudanca no mart.
 
+## Dagster e o Python 3.14
+
+O Dagster estava como próximo bloco de infraestrutura e **não foi instalado**.
+O motivo é duro e não some com paciência: todo `dagster-dbt` moderno declara
+`Requires-Python >=3.10,<3.14`, e o venv do projeto é 3.14.5.
+
+O perigo está em como o pip reage. Ele não falha — resolve para o
+`dagster-dbt 0.11.14`, de 2021, que é a última versão sem teto de Python. Essa
+versão pina `agate<1.6.2`, enquanto o `dbt-core 1.12` exige o `agate 1.9.1`
+instalado. Aceitar essa resolução **rebaixaria o agate e quebraria o dbt
+inteiro**, e o comando que faz isso é um `pip install dagster-dbt` de aparência
+inocente.
+
+O Dagster core (`dagster`, `dagster-webserver`) instala limpo em 3.14 e não
+toca em `agate` nem em `dbt-*`. Ou seja, dá para orquestrar hoje chamando
+`dbt build` por subprocess — o que se perde é o grafo com um asset por model.
+
+**Três caminhos, e o escolhido foi adiar.** Orquestrar sem `dagster-dbt`
+entregaria a automação mas não o grafo; recriar o venv em 3.13 entregaria os
+dois ao custo de revalidar dbt, API, front e ML; adiar custa nada agora. A
+decisão foi adiar até o docker-compose, onde a imagem fixa 3.13 sem mexer na
+máquina de ninguém — ali os dois objetivos saem juntos e o risco fica contido
+no container.
+
+## Onde a cobertura parcial deve aparecer
+
+A home já abriu explicando cota de API, ondas de extração e percentual de
+cobertura, com uma seção inteira sobre as "duas profundidades" da base. Estava
+honesto e estava errado: quem abre um app de futebol quer ver futebol, e como o
+dado chegou ali é problema de quem construiu.
+
+A regra que ficou: **a ressalva mora onde muda uma decisão de leitura**, não na
+porta de entrada. Ao lado do número que ela afeta, dentro das análises; no
+`cuidado` do verbete no glossário; e como selo do que existe — "análise
+detalhada" numa competição que tem lance a lance — em vez de aviso do que falta.
+Competição sem detalhe simplesmente não mostra selo.
+
+A diferença é de enquadramento e importa para onde o projeto vai: quando a base
+cobrir todos os clubes, o selo vira o normal em vez da exceção, sem mudar uma
+linha. Uma seção "olha o que falta" na abertura envelheceria mal e transformaria
+a limitação no assunto principal de um app que não é sobre ela.
+
+## Cobertura contada dentro do grupo mede outra coisa
+
+O `gold_gols_por_periodo` calculava `jogos_com_evento` como
+`count(distinct fixture_id)` no mesmo `group by` das faixas de 15 minutos. Isso
+não responde "quantos jogos foram analisados" e sim "em quantos jogos houve gol
+NESTA faixa" — número menor, plausível, e silenciosamente errado.
+
+A tela lia a primeira faixa e anunciava **"13 de 38 jogos com lances extraídos"
+numa temporada 38 de 38**: subestimava a própria base em três vezes. Nada
+acusava, porque 13 é um número perfeitamente possível.
+
+A correção é calcular a cobertura fora do grupo, num CTE que conta as partidas
+do time com lance extraído independente de faixa. Vale para qualquer mart com
+recorte: **se o denominador entra no `group by` junto com o recorte, ele deixa
+de ser denominador.** O `assert_cartao_fecha_com_disciplina` tranca isso
+comparando a cobertura entre dois marts que a calculam por caminhos diferentes.
+
 ## Lições de visualização
 
 Duas correções que valem para os próximos gráficos.
@@ -386,23 +445,24 @@ Esta lista já esteve duplicada — Dagster e Postgres apareciam duas vezes, em
 ordens contrárias, resíduo de duas edições. Foi consolidada; se ela voltar a ter
 o mesmo item em dois lugares, o de baixo é o antigo.
 
-1. **Terminar a onda 3** — 200 requisições, umas 3 execuções. É o que mais entrega
-   valor por requisição, então vem antes de qualquer extração nova. Quando
-   fechar, as telas que hoje mostram cobertura parcial (momento dos gols,
-   estatística de jogo, perfil estatístico, elenco) se completam sozinhas.
-   Lembrando que 56 desses pedidos vão voltar vazios, pelo Paranaense.
+1. **Terminar a onda 3** — 100 requisições, uma execução com `--orcamento 100`.
+   Quando fechar, as telas que hoje mostram cobertura parcial (momento dos gols,
+   estatística de jogo, perfil estatístico, cartões, elenco) se completam
+   sozinhas.
 2. **Esgotar em tela o que a base já tem.** Prioridade acima de infraestrutura:
    dado extraído e não exibido não vale nada, e cada mart novo custa horas
    contra os dias de cota que a extração custa. Foi o que revelou, numa sessão
    só, que `silver_partida_estatistica` não tinha nenhum consumidor no gold e
    que a posse de bola estava nula desde o começo. Enquanto houver coluna sem
    consumidor, este item continua aberto.
-3. **Dagster** — três etapas com dependência e ritmos diferentes (extração
-   diária, dbt depois dela, treino sob demanda), e automatiza o `extrair.py`
-   que hoje é rodado à mão todo dia.
-4. **Postgres e docker-compose** — separar os papéis (DuckDB transforma,
+3. **Postgres e docker-compose** — separar os papéis (DuckDB transforma,
    Postgres serve) e tirar a aplicação do "roda na minha máquina". É aqui que o
    MinIO entra, se a ideia de exercitar object storage for retomada.
+4. **Dagster, junto com o docker-compose e não antes.** Ele era o item 3 e
+   desceu por incompatibilidade real, não por prioridade: o `dagster-dbt` não
+   roda no Python 3.14 do venv, e a imagem do compose é onde dá para fixar 3.13
+   sem mexer na máquina. Ver *Dagster e o Python 3.14* — em especial o motivo de
+   não bastar rodar `pip install`.
 5. **Retomar o ML** quando houver volume: plano Pro (2015+) e/ou onda 3
    completa para as features de estatística.
 

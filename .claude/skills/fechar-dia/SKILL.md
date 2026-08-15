@@ -57,15 +57,28 @@ Reporte também o estado da extração, que é o que define o dia seguinte:
 env/bin/python -c "
 import os, requests, extrair, collections
 from dotenv import load_dotenv; load_dotenv()
-q = requests.get(os.getenv('URL')+'/status',
-                 headers={'x-apisports-key':os.getenv('API-KEY')}).json()['response']['requests']
+
+# A cota vem primeiro, e pode nao vir: com o limite diario atingido a API
+# recusa ate o /status, devolvendo response vazio e um bloco errors. Como o
+# fechamento roda no fim do dia, esse e o caso COMUM e nao a excecao — por isso
+# a consulta e opcional e a fila, que sai de data/raw, nunca depende dela.
+try:
+    r = requests.get(os.getenv('URL')+'/status',
+                     headers={'x-apisports-key':os.getenv('API-KEY')}).json()
+    q = r['response']['requests']
+    print(f\"cota: {q['current']}/{q['limit_day']}\")
+except Exception:
+    print('cota: esgotada hoje (a API recusa ate o /status no limite)')
+
 p = extrair.pendentes()
-c = collections.Counter(t[0] for t in p)
-print(f\"cota: {q['current']}/{q['limit_day']}\")
+c = collections.Counter(t.dataset for t in p)
 print(f'pendentes: {len(p)} de {len(extrair.montar_tarefas())}')
 for k, v in sorted(c.items()): print(f'  {k:22} {v}')
 "
 ```
+
+O `t.dataset` acima depende de as tarefas serem `Tarefa` (NamedTuple). Se um dia
+voltarem a ser tupla crua, e `t[0]`.
 
 Qualquer falha aqui interrompe o fechamento. Não documente nem commite código
 que não compila.

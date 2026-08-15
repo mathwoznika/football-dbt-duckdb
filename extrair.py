@@ -350,7 +350,18 @@ def previsao(tarefas):
 # ------------------------------------------------------------------ rodar
 
 
-def main():
+def main(orcamento=None):
+    """Roda a fila ate o orcamento acabar.
+
+    O `orcamento` sobrepoe o do plano e serve para dois casos reais: gastar o
+    resto da cota do dia quando sobram poucas requisicoes, e fechar a ponta
+    final de uma fila sem precisar de mais um dia inteiro. O teto padrao e 95 e
+    nao 100 de proposito — a folga cobre o retry de um 429 ou 5xx, que tambem
+    consome requisicao.
+    """
+    global ORCAMENTO
+    if orcamento:
+        ORCAMENTO = orcamento
     apifootball.definir_ritmo(PLANOS[PLANO]["por_minuto"])
     gastos = 0
 
@@ -413,4 +424,7 @@ if __name__ == "__main__":
     if "--diagnostico" in sys.argv:
         diagnostico()
     else:
-        main()
+        teto = None
+        if "--orcamento" in sys.argv:
+            teto = int(sys.argv[sys.argv.index("--orcamento") + 1])
+        main(teto)

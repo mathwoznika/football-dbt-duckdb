@@ -15,7 +15,7 @@ apifootball.py     cliente da API-Football: HTTP, rate limit, gravação do raw
 extrair.py         o que extrair (ligas, temporadas, escopo). É o arquivo editado
 data/raw/          JSON cru, imutável, um arquivo por resposta da API
 data/warehouse.duckdb   banco de trabalho do dbt
-transform/         projeto dbt (40 models, 10 testes singulares)
+transform/         projeto dbt (45 models, 11 testes singulares)
 api/               nossa API (FastAPI) — não confundir com apifootball.py
 web/               front (Vite + React + TypeScript, 8 páginas)
 ml/treinar.py      experimento de previsão — PAUSADO, sem consumidor
@@ -69,6 +69,13 @@ ordenam. Lógica nova vira model de gold, onde fica versionada e testada. Vale
 para a tela pelo mesmo motivo: dividir o tamanho da tabela por 4 para achar o
 tamanho do quartil funciona em liga de 20 times e mente numa de 18 — o número
 tem que sair do mart, que sabe a resposta, e não de uma conta na renderização.
+
+**Rótulo de métrica nasce no glossário.** Nome de coluna e definição moram em
+`web/src/glossario.ts`, e a tela usa `<Termo k="...">` no cabeçalho e
+`<Glossario termos={[...]}>` na legenda. Escrever o rótulo direto no JSX volta
+ao problema que isso resolveu: o mesmo conceito com quatro nomes em quatro
+tabelas, cada um explicado por uma nota de rodapé diferente. Chave inexistente
+quebra na compilação.
 
 **Features de ML não podem vazar.** Toda janela em `gold_features_partida`
 termina em `1 preceding`, nunca `current row`. As colunas de alvo têm prefixo
@@ -133,6 +140,23 @@ for (t,) in con.execute(\"select table_name from duckdb_tables()\").fetchall():
 "
 ```
 
+**Hook depois de `return` passa no build e quebra na tela.** O React exige que
+todo hook rode em toda renderização, na mesma ordem. Colocar um `useState` ou
+`useDados` abaixo de um early return — ou dentro de um `if` — faz o hook rodar
+em umas renderizações e não em outras, e o React perde a conta de qual estado
+pertence a qual hook. **O TypeScript não pega isso**: `npm run build` passa
+limpo e o erro só aparece em execução, no caminho raro (o jogador sem dado, o
+time não encontrado). Ao inserir hook em componente que já existe, confira que
+ele está acima de qualquer `return`:
+
+```bash
+cd web/src/pages && for f in *.tsx; do
+  h=$(grep -n "useDados(\|useState(\|useLimiteDeLinhas(" $f | grep -v import | tail -1 | cut -d: -f1)
+  r=$(grep -n "^  if (.*) {" $f | head -1 | cut -d: -f1)
+  [ -n "$h" ] && [ -n "$r" ] && [ "$h" -gt "$r" ] && echo "VERIFICAR $f: hook na $h, return na $r"
+done; echo ok
+```
+
 **Nomes sobrecarregados em português.** `cartao` já é o painel da interface no
 CSS — usar a mesma classe para cartão de arbitragem colapsou todos os painéis
 do app para 6px. Antes de criar uma classe, verifique se o nome já existe:
@@ -150,25 +174,28 @@ O mesmo cuidado vale para `time` (equipe vs. tempo) e `partida` (jogo vs. iníci
 
 ## Onde o projeto está
 
-**Extração:** onda 3 em 107 de 168 jogos, **200 tarefas pendentes**, umas 3
-execuções a 95 requisições/dia. Rodar `env/bin/python extrair.py` uma vez por dia
-até zerar. Série A 2022 e 2023 estão completas nos quatro datasets; a fila agora
-começa pela **Série B 2024**, que é a temporada ainda intocada. Tudo o mais
-(calendários, ligas, times, classificações, artilheiros, técnicos,
-transferências) já está extraído.
+**Extração: 100 tarefas pendentes, e uma execução zera a onda 3.**
 
-**Pronto e no ar:** 40 models, 28 endpoints, 8 páginas — times, jogadores,
-jogo com campinho posicionado, competições com classificação/artilharia/
-chaveamento/evolução, elenco em duas leituras (totais e por 90 minutos), e
-análises (1º x 2º tempo, momento dos gols, origem dos gols, banco e trocas,
-técnicos, arbitragem, perfil estatístico, faixa do adversário, formações).
+```bash
+env/bin/python extrair.py --orcamento 100
+```
+
+Sobram Série B 2024 (52), Paranaense 2023/2024 (44, só evento e escalação — os
+outros dois endpoints estão em `SEM_DADO`) e Copa do Brasil 2024 (4). Série A
+2022 e 2023 já estão completas nos quatro datasets. Tudo o mais (calendários,
+ligas, times, classificações, artilheiros, técnicos, transferências) também.
+
+**Pronto e no ar:** 45 models, 32 endpoints, 9 páginas. Home com recordes e
+campeões, competições, clubes, jogadores, jogo com campinho posicionado, elenco
+em duas leituras (totais e por 90 minutos), e a página de análises com 11 seções
+distribuídas em 4 abas — o jogo, ataque e defesa, disciplina, elenco e comissão.
 
 **ML pausado**, e não por falta de esforço: ver a seção correspondente no
 `docs/contexto.md` antes de retomar.
 
-**Próximo bloco:** esgotar o que a base já tem em telas e relatórios, e só
-depois Dagster, Postgres e docker-compose. O raciocínio está no fim do
-`contexto.md`.
+**Próximo bloco:** esgotar o que a base já tem em telas, depois Postgres e
+docker-compose. O Dagster saiu da frente da fila por incompatibilidade real —
+ver *Dagster e o Python 3.14* no `contexto.md` antes de tentar de novo.
 
 ## Skills
 

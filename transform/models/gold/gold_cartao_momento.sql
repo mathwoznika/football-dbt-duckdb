@@ -1,37 +1,36 @@
--- Em que momento do jogo o time marca e sofre.
+-- Em que momento do jogo o time toma e provoca cartao.
 -- Grao: (time, competicao, temporada, faixa de 15 minutos).
 --
--- COBERTURA PARCIAL, e isso muda como a tela deve apresentar: vem dos eventos,
--- que so existem para os jogos ja alcancados pela onda 3. Diferente do
--- gold_desempenho_por_tempo, que cobre os 1.746 jogos porque o placar do
--- intervalo esta no proprio fixture.
+-- Espelha o gold_gols_por_periodo de proposito, ate nos nomes das faixas: as
+-- duas telas ficam lado a lado e comparar "quando marco" com "quando me
+-- indisciplino" so funciona se o eixo for o mesmo.
 --
--- A coluna jogos_com_evento diz sobre quantas partidas a distribuicao foi
--- calculada — sem ela, comparar duas temporadas com coberturas diferentes
--- levaria a conclusao errada.
+-- O DADO TEM SINAL FORTE. Na base inteira, a ultima faixa concentra 206 dos
+-- 684 amarelos e 13 dos 29 vermelhos, contra 45 amarelos nos primeiros quinze
+-- minutos. Cartao nao se distribui pelo jogo: ele se acumula no fim.
 --
--- E ELA PRECISA SER CALCULADA FORA DO GRUPO. Contando fixture dentro da faixa,
--- a resposta vira "em quantos jogos houve gol NESTA faixa", que e outra
--- pergunta e da um numero bem menor: a Serie A 2022 do Coritiba aparecia com
--- 13, e a tela — que le a primeira faixa — anunciava "13 de 38 jogos com
--- lances extraidos" para uma temporada 38 de 38. Subestimava a propria base em
--- tres vezes.
+-- "Provocados" sao os cartoes que o ADVERSARIO tomou naquela partida. Nao e o
+-- mesmo que provocacao no sentido literal — e o contexto que falta para ler o
+-- proprio numero, porque um jogo truncado castiga os dois lados.
+--
+-- COBERTURA PARCIAL: vem dos eventos, que so existem para os jogos alcancados
+-- pela onda 3. jogos_com_evento diz sobre quantas partidas a conta foi feita.
 
 with eventos as (
 
     select * from {{ ref('gold_partida_evento') }}
-    where tipo = 'Goal'
+    where tipo = 'Card'
 
 ),
 
--- de qual jogo veio cada evento, para saber a que time atribuir
 partidas as (
 
     select * from {{ ref('silver_partida_time') }}
 
 ),
 
--- um gol vira duas linhas: "a favor" para quem marcou, "contra" para o outro
+-- Um cartao vira duas linhas: "tomado" para quem levou, "provocado" para o
+-- outro lado da mesma partida.
 atribuido as (
 
     select
@@ -42,7 +41,8 @@ atribuido as (
         partidas.season,
         eventos.fixture_id,
         eventos.minuto,
-        eventos.team_id = partidas.time_id as foi_a_favor
+        eventos.detalhe,
+        eventos.team_id = partidas.time_id as foi_tomado
     from eventos
     join partidas on partidas.fixture_id = eventos.fixture_id
 
@@ -73,8 +73,10 @@ com_faixa as (
 
 ),
 
--- Partidas do time que tem lance extraido, independente de ter havido gol.
--- E esta a cobertura que a tela precisa anunciar.
+-- Cobertura de VERDADE: partidas do time que tem lance extraido, sem olhar
+-- faixa. Precisa ser calculada separado — contar fixture dentro do grupo
+-- responderia "em quantos jogos houve cartao NESTA faixa", que e outra
+-- pergunta e da um numero menor.
 cobertura as (
 
     select
@@ -97,9 +99,13 @@ select
     com_faixa.season,
     com_faixa.faixa,
     com_faixa.ordem_faixa,
-    count(*) filter (where foi_a_favor)     as marcados,
-    count(*) filter (where not foi_a_favor) as sofridos,
-    any_value(cobertura.jogos_com_evento)   as jogos_com_evento
+
+    count(*) filter (where foi_tomado)                             as tomados,
+    count(*) filter (where foi_tomado and detalhe = 'Yellow Card') as amarelos,
+    count(*) filter (where foi_tomado and detalhe = 'Red Card')    as vermelhos,
+    count(*) filter (where not foi_tomado)                         as provocados,
+
+    any_value(cobertura.jogos_com_evento)                          as jogos_com_evento
 from com_faixa
 join cobertura
   on cobertura.time_id   = com_faixa.time_id
