@@ -1,0 +1,18 @@
+# Dependencias da API (container `api`).
+#
+# Enxuta de proposito: a imagem que serve HTTP nao precisa de dbt, pandas nem
+# mlflow. Versoes fixas para a imagem ser reproduzivel — o venv de
+# desenvolvimento e a fonte destes numeros.
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+pydantic==2.13.4
+python-dotenv==1.2.2
+
+# Backend de leitura em producao. O pool importa: abrir conexao no Postgres
+# custa ordens de grandeza mais que no DuckDB.
+psycopg[binary]==3.2.10
+psycopg-pool==3.2.6
+
+# Mantido para BANCO=duckdb continuar funcionando dentro do container, util
+# para depurar sem depender do Postgres.
+duckdb==1.5.5

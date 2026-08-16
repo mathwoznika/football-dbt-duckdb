@@ -233,6 +233,36 @@ exceção conhecida é `duelos`, nulo em 5,5% de quem jogou 60+ minutos: ali é
 mesmo "não registrado", e o efeito de tratar como zero é subestimar, nunca
 inventar.
 
+**O mesmo `player_id` vem com grafias diferentes entre partidas.** "Nathan" e
+"Nathan Mendes", "Baralhas" e "Gabriel Baralhas", "Daniel" e "Danielzinho" — são
+36 jogadores na base. O id é estável; o nome não.
+
+Isso partiu o `gold_jogador_temporada` ao meio por muito tempo. O model usava
+`group by all`, que inclui toda coluna não agregada — inclusive `jogador_nome`.
+A temporada do jogador virava **duas linhas**, cada uma com parte dos jogos:
+
+```
+Nathan         São Paulo 2023   1 jogo   95 min
+Nathan Mendes  São Paulo 2023   1 jogo    — min
+```
+
+O sintoma era silencioso: nenhum total geral mudava, porque a soma das duas
+linhas continuava certa. Quebrava a leitura por jogador e, pior, as taxas por 90
+minutos — uma linha ficava com os minutos e a outra com zero.
+
+A correção é agregar o nome com `max()`, e `max` e não `any_value` por dois
+motivos: precisa ser determinístico, e quando uma grafia é prefixo da outra o
+máximo alfabético é justamente a forma mais completa. O
+`assert_jogador_temporada_grao_unico` tranca o grão.
+
+Vale a regra geral: **coluna descritiva não entra em chave de agrupamento**. Com
+`group by all`, qualquer texto que a fonte escreva de dois jeitos vira uma linha
+extra.
+
+**`player_id = 0` é o desconhecido da fonte**, não um jogador. São 8 pessoas
+diferentes sob o mesmo id no `gold_jogador_temporada`. Volume pequeno, mas
+qualquer ranking por jogador deveria excluí-lo.
+
 **O gol contra é creditado ao time que se beneficia, mas guarda o autor
 adversário.** Murillo, do Corinthians, aparece sob "Coritiba". A consequência é
 assimétrica e vale registrar: somar gols por **time** é seguro — bate com o
@@ -360,29 +390,93 @@ Detalhe metodologico que vale manter: o script **quebra** se aparecer NaN nas
 features, em vez de imputar. Preencher com a mediana em silencio esconderia
 mudanca no mart.
 
-## Dagster e o Python 3.14
+## Arquitetura de dois bancos
 
-O Dagster estava como próximo bloco de infraestrutura e **não foi instalado**.
-O motivo é duro e não some com paciência: todo `dagster-dbt` moderno declara
-`Requires-Python >=3.10,<3.14`, e o venv do projeto é 3.14.5.
+O DuckDB aceita **ou** um processo escrevendo **ou** vários lendo. Isso é
+tolerável no desenvolvimento — a API abre em `read_only` e quem roda o dbt fecha
+o resto — e deixa de ser quando a aplicação está no ar e o pipeline transforma
+enquanto alguém navega.
 
-O perigo está em como o pip reage. Ele não falha — resolve para o
-`dagster-dbt 0.11.14`, de 2021, que é a última versão sem teto de Python. Essa
-versão pina `agate<1.6.2`, enquanto o `dbt-core 1.12` exige o `agate 1.9.1`
-instalado. Aceitar essa resolução **rebaixaria o agate e quebraria o dbt
-inteiro**, e o comando que faz isso é um `pip install dagster-dbt` de aparência
-inocente.
+A saída não foi trocar de banco, foi separar papéis. O **DuckDB transforma**,
+porque lê 770 JSONs aninhados sem esforço e o Postgres não. O **Postgres serve**,
+porque aguenta leitura concorrente e o DuckDB não. Cada um onde é forte.
 
-O Dagster core (`dagster`, `dagster-webserver`) instala limpo em 3.14 e não
-toca em `agate` nem em `dbt-*`. Ou seja, dá para orquestrar hoje chamando
-`dbt build` por subprocess — o que se perde é o grafo com um asset por model.
+**A cópia usa a extensão `postgres` do próprio DuckDB.** O `sincronizar.py` dá
+`ATTACH` no Postgres como se fosse um banco local e roda
+`create table pg.x as select * from wh.x` dentro do motor, em bloco. Sem CSV
+intermediário, sem laço em Python, sem conversão de tipo na mão — `date`
+continua date e `boolean` continua boolean do outro lado.
 
-**Três caminhos, e o escolhido foi adiar.** Orquestrar sem `dagster-dbt`
-entregaria a automação mas não o grafo; recriar o venv em 3.13 entregaria os
-dois ao custo de revalidar dbt, API, front e ML; adiar custa nada agora. A
-decisão foi adiar até o docker-compose, onde a imagem fixa 3.13 sem mexer na
-máquina de ninguém — ali os dois objetivos saem juntos e o risco fica contido
-no container.
+Detalhe que custou uma tentativa: **o modo read-only vale para a conexão
+inteira**, e todo banco anexado herda. Abrir o warehouse com `read_only=True` e
+anexar o Postgres faz o `CREATE` ser recusado. Abrir o warehouse em escrita
+resolveria e tomaria o lock exclusivo durante a cópia — justamente o que a
+separação existe para evitar. A solução é uma conexão **em memória** no meio:
+o warehouse entra read-only, o Postgres entra gravável.
+
+**Só as 30 tabelas que a API lê são copiadas**, e a lista sai de `api/main.py`
+por regex. Bronze e silver ficam no DuckDB: são insumo de transformação e
+ninguém os consulta pela tela. Derivar a lista em vez de mantê-la à mão mata o
+modo de falha mais chato — endpoint novo, sincronia esquecida, e a tela quebra
+só no ambiente com Postgres, onde ninguém desenvolve.
+
+### O que o mesmo SQL não garante
+
+A API atende os dois bancos com consultas idênticas, o que só é possível porque
+ela não calcula: o que sobra é `select … where … order by`, que é ANSI. Mas
+"mesmo SQL" não é "mesmo resultado", e três diferenças apareceram:
+
+1. **Parâmetro sem tipo inferível.** `(? is null or season = ?)` funciona no
+   DuckDB e o Postgres responde `could not determine data type of parameter $2`.
+   Precisa de `cast(? as integer)`.
+2. **`%` literal.** O psycopg trata `%` como marcador, então
+   `like '%' || ? || '%'` explode. Escapar para `%%` **antes** de trocar `?` por
+   `%s` — na ordem inversa o `%s` novo viraria `%%s`.
+3. **`year()` não existe no Postgres.** Use `extract(year from ...)`.
+
+Nenhuma delas aparece na compilação ou no `dbt build`. Daí o
+`verificar_bancos.py`, que bate status e corpo das 39 rotas nos dois bancos —
+foi ele que achou as três, e mais uma coisa que ninguém procurava (ver
+*Ordenação sem desempate*, abaixo).
+
+## Ordenação sem desempate muda o resultado
+
+Onze rotas tinham `ORDER BY` que não definia ordem total. O sintoma óbvio é
+cosmético — as linhas saem em ordem diferente em cada banco — mas o real não é:
+em `/transferencias` o empate caía **no corte do `limit 60`**, e cada motor
+escolhia linhas diferentes para entrar na resposta.
+
+Isso nunca foi um problema "de Postgres". A mesma consulta, no mesmo banco, pode
+devolver ordens diferentes entre execuções — só ninguém tinha reparado porque o
+DuckDB é estável na prática com dado pequeno. A regra que ficou está no
+`CLAUDE.md`: todo `ORDER BY` termina com uma coluna que identifica a linha.
+
+## Dagster: o bloqueio era o dbt-core, não só o Python
+
+A versão anterior desta seção dizia que o `dagster-dbt` não roda em Python 3.14
+e que por isso o Dagster ficaria para o docker-compose. Estava certa e
+**incompleta**: subir para 3.13 não bastou.
+
+O `dagster-dbt 0.29.18` declara `Requires-Dist: dbt-core<1.12,>=1.7`, e o
+projeto usava 1.12.0. Mesmo em 3.13 o pip continuava resolvendo para o
+`dagster-dbt 0.10.9`, de 2021 — que não tem `@dbt_assets`. **O pip nunca falha
+nesse caminho**, ele só desce silenciosamente até achar algo que caiba.
+
+A decisão foi fixar `dbt-core==1.11.13` na imagem do pipeline, e ela só foi
+tomada depois de testar: o projeto inteiro rodou em 1.11.13 dentro de um
+container descartável, 173 passos e zero erro. Sem esse teste, seria trocar um
+bloqueio conhecido por um risco desconhecido.
+
+**Por que valeu o downgrade em vez de chamar `dbt build` por subprocess.** A
+alternativa entregaria a automação — que é o valor operacional — mas não o
+grafo. Com o `dagster-dbt`, cada um dos 45 models vira asset: dá para ver quais
+marts dependem de quê, materializar só um ramo, e ler o resultado dos testes
+como metadado. Num projeto cujo ponto é justamente a linhagem, o grafo não é
+enfeite.
+
+O agendamento nasce **ligado** (`default_status=RUNNING`). O padrão do Dagster é
+criar parado, o que faz sentido em produção compartilhada e não aqui, onde subir
+o serviço já é a declaração de que se quer o pipeline rodando.
 
 ## Onde a cobertura parcial deve aparecer
 
@@ -445,26 +539,27 @@ Esta lista já esteve duplicada — Dagster e Postgres apareciam duas vezes, em
 ordens contrárias, resíduo de duas edições. Foi consolidada; se ela voltar a ter
 o mesmo item em dois lugares, o de baixo é o antigo.
 
-1. **Terminar a onda 3** — 100 requisições, uma execução com `--orcamento 100`.
-   Quando fechar, as telas que hoje mostram cobertura parcial (momento dos gols,
-   estatística de jogo, perfil estatístico, cartões, elenco) se completam
-   sozinhas.
-2. **Esgotar em tela o que a base já tem.** Prioridade acima de infraestrutura:
-   dado extraído e não exibido não vale nada, e cada mart novo custa horas
-   contra os dias de cota que a extração custa. Foi o que revelou, numa sessão
-   só, que `silver_partida_estatistica` não tinha nenhum consumidor no gold e
-   que a posse de bola estava nula desde o começo. Enquanto houver coluna sem
-   consumidor, este item continua aberto.
-3. **Postgres e docker-compose** — separar os papéis (DuckDB transforma,
-   Postgres serve) e tirar a aplicação do "roda na minha máquina". É aqui que o
-   MinIO entra, se a ideia de exercitar object storage for retomada.
-4. **Dagster, junto com o docker-compose e não antes.** Ele era o item 3 e
-   desceu por incompatibilidade real, não por prioridade: o `dagster-dbt` não
-   roda no Python 3.14 do venv, e a imagem do compose é onde dá para fixar 3.13
-   sem mexer na máquina. Ver *Dagster e o Python 3.14* — em especial o motivo de
-   não bastar rodar `pip install`.
-5. **Retomar o ML** quando houver volume: plano Pro (2015+) e/ou onda 3
-   completa para as features de estatística.
+**O roteiro original acabou.** Onda 3 completa, telas esgotando o que a base
+tem, Postgres servindo, docker-compose de pé e Dagster orquestrando. O que
+sobrou depende de dinheiro ou é escolha de produto.
+
+1. **Retomar o ML** — bloqueado por volume, e **só o plano pago resolve**.
+   Atenção a um erro que esteve escrito aqui: a versão anterior dizia "plano Pro
+   *e/ou* onda 3 completa". A segunda condição nunca valeu. A onda 3 sempre
+   cobriu apenas os jogos do Coritiba, então fechá-la deixa a estatística
+   disponível em 6,8% das linhas do `gold_features_partida` — 10% mesmo no
+   recorte de Série A. Feature presente em um décimo das linhas não treina nada.
+2. **Escopo maior na extração** — Libertadores, Sul-Americana, Série C, mais
+   temporadas. O `extrair.py` já está preparado (ver *O escopo é declarativo*);
+   o que falta é cota. Rode o `--diagnostico` assim que as competições novas
+   entrarem: cada uma revelou uma particularidade própria até agora.
+3. **Produto.** A lacuna mais visível é **comparar dois clubes lado a lado** —
+   usa a largura da base, então vale para os 153 times sem ressalva de amostra.
+   Depois disso, o que sobra no gold sem consumidor são colunas soltas
+   (`comentario` do evento, `tipo_bruto` da transferência, `interceptacoes`),
+   nada que sustente uma tela.
 
 Condicionado ao plano pago: `/players` completo sobe para o topo, porque deixa
-de custar 3 dias de cota e passa a custar minutos.
+de custar 3 dias de cota e passa a custar minutos. Ele **pagina** (~30 páginas
+por liga-temporada) — o `apifootball` já sabe lidar, basta marcar
+`paginado=True` na `Tarefa`.

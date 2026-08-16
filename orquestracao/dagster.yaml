@@ -1,0 +1,13 @@
+# Configuracao da instancia do Dagster.
+#
+# Sem este arquivo ele avisa a cada comando que esta usando os padroes. Os
+# padroes servem: SQLite local em DAGSTER_HOME, que sobrevive ao container pelo
+# volume `dagster_home`. Trocar por Postgres so se paga com varias filas e
+# execucao distribuida — aqui seria cerimonia.
+telemetry:
+  enabled: false
+
+# Execucao morta ha mais de um dia vira falha em vez de ficar "em andamento"
+# para sempre. Acontece quando o container morre no meio de um run.
+run_monitoring:
+  enabled: true

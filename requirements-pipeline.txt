@@ -1,0 +1,19 @@
+# Dependencias do container `pipeline`: extrai, transforma, sincroniza e
+# orquestra. Separado da API porque sao trabalhos diferentes — este roda e
+# morre, a API fica de pe. Juntar faria a API carregar dbt e dagster sem usar.
+
+# dbt-core FIXO EM 1.11, e nao 1.12. O dagster-dbt exige `dbt-core<1.12`, e o
+# pip nao avisa: sem o pino ele desce sozinho para o dagster-dbt 0.10.9, de
+# 2021, que nao tem @dbt_assets. O projeto inteiro foi rodado em 1.11.13 antes
+# de fixar — 173 passos, zero erro.
+dbt-core==1.11.13
+dbt-duckdb==1.11.0
+duckdb==1.5.5
+requests==2.34.2
+python-dotenv==1.2.2
+
+# Orquestracao. `dagster dev` sobe webserver e daemon juntos, que e o suficiente
+# nesta escala — separar os dois processos so se paga com varias filas.
+dagster==1.13.18
+dagster-webserver==1.13.18
+dagster-dbt==0.29.18

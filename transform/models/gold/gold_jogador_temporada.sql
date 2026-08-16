@@ -37,11 +37,26 @@ agregado as (
 
 select
     player_id,
-    jogador_nome,
     team_id,
-    team_nome,
     season,
     league_id,
+
+    -- O NOME PRECISA SER AGREGADO, e isso nao e detalhe cosmetico. A fonte
+    -- devolve o MESMO player_id com grafias diferentes entre partidas: "Nathan"
+    -- e "Nathan Mendes", "Baralhas" e "Gabriel Baralhas", "Daniel" e
+    -- "Danielzinho". Sao 36 jogadores na base.
+    --
+    -- Com o nome na chave de agrupamento — e o `group by all` o colocava la —
+    -- a temporada do jogador se PARTIA EM DUAS LINHAS, cada uma com parte dos
+    -- jogos e dos minutos. O Nathan Mendes no Sao Paulo 2023 aparecia como dois
+    -- jogadores de um jogo cada, e qualquer taxa por 90 saia sem sentido: uma
+    -- linha ficava com os 95 minutos e a outra com nenhum.
+    --
+    -- `max` e nao `any_value` porque precisa ser deterministico: com o mesmo
+    -- dado, dois motores tem que devolver o mesmo nome. E, quando uma grafia e
+    -- prefixo da outra, o maximo alfabetico e justamente a forma mais completa.
+    max(jogador_nome)      as jogador_nome,
+    max(team_nome)         as team_nome,
     any_value(league_nome) as league_nome,
 
     -- CUIDADO com a diferenca: o endpoint lista todo mundo que foi

@@ -15,13 +15,24 @@ apifootball.py     cliente da API-Football: HTTP, rate limit, gravação do raw
 extrair.py         o que extrair (ligas, temporadas, escopo). É o arquivo editado
 data/raw/          JSON cru, imutável, um arquivo por resposta da API
 data/warehouse.duckdb   banco de trabalho do dbt
-transform/         projeto dbt (45 models, 11 testes singulares)
+transform/         projeto dbt (45 models, 12 testes singulares)
 api/               nossa API (FastAPI) — não confundir com apifootball.py
-web/               front (Vite + React + TypeScript, 8 páginas)
+web/               front (Vite + React + TypeScript, 9 páginas)
+sincronizar.py     copia o gold do DuckDB para o Postgres, que serve a API
+verificar_bancos.py  compara as respostas da API nos dois bancos, rota a rota
+orquestracao/      definições do Dagster (assets, agendamento)
+docker/            Dockerfiles e nginx
+docker-compose.yml postgres · pipeline · api · web · dagster
+requirements-*.txt api e pipeline, separados — ver o topo de cada um
 ml/treinar.py      experimento de previsão — PAUSADO, sem consumidor
 docs/contexto.md   por que cada decisão foi tomada
 .claude/skills/    fluxos repetíveis (novo-dataset, fechar-dia)
 ```
+
+**Dois ambientes, e eles usam bancos diferentes.** Na máquina, a API lê o
+arquivo DuckDB direto (`BANCO=duckdb`, o padrão). No compose, ela lê o Postgres
+(`BANCO=postgres`), alimentado pelo `sincronizar.py`. O SQL é o mesmo nos dois —
+ver *Arquitetura de dois bancos* no `contexto.md`.
 
 ## Comandos
 
@@ -43,6 +54,24 @@ cd web && npm run dev                        # http://localhost:5173
 
 # verificação de tipos do front — use ESTE, não `tsc --noEmit`
 cd web && npm run build
+
+# ---------------------------------------------------------- docker
+# a stack inteira: postgres, pipeline (dbt + sync), api e front
+docker compose up -d --build     # front :8080 · api :8000 · postgres :5432
+
+# reprocessa depois de uma extração nova, sem subir o resto de novo
+docker compose run --rm pipeline
+
+# orquestração, atrás de profile porque o site não depende dela
+docker compose --profile orquestracao up -d dagster   # http://localhost:3000
+
+# ---------------------------------------------------------- verificações
+# copia o gold para o Postgres (o compose já faz isso; use solto ao depurar)
+env/bin/python sincronizar.py
+
+# a API responde igual nos dois bancos? roda com os dois de pé
+env/bin/uvicorn api.main:app --port 8011 &
+env/bin/python verificar_bancos.py
 ```
 
 O venv é `env/`. Chame sempre pelo caminho (`env/bin/python`), sem depender de
@@ -83,6 +112,20 @@ termina em `1 preceding`, nunca `current row`. As colunas de alvo têm prefixo
 
 **Endpoint sem dado devolve lista vazia, não 404.** Série A não tem chaveamento
 e copa não tem tabela; as duas são respostas válidas.
+
+**Todo `ORDER BY` precisa de desempate.** Ordenação que não define uma ordem
+total deixa as linhas empatadas em posição arbitrária — e o motor escolhe
+diferente entre execuções e entre bancos. Com `LIMIT`, muda **quais** linhas
+aparecem, não só a ordem: em `/transferencias` o empate caía no corte do
+`limit 60`. Termine sempre com uma coluna que identifique a linha
+(`player_id`, `league_id`, `arbitro`). O `verificar_bancos.py` pega o que
+escapar.
+
+**O SQL da API roda nos dois bancos.** Nada de função exclusiva do DuckDB nas
+rotas — `year()` não existe no Postgres, use `extract(year from ...)`. Isso é
+barato de manter só porque a API não calcula: o que sobra é `select … where …
+order by`, que é ANSI. Se uma consulta precisar de algo específico do motor, o
+lugar dela é num model.
 
 ## Armadilhas conhecidas
 
@@ -157,6 +200,27 @@ cd web/src/pages && for f in *.tsx; do
 done; echo ok
 ```
 
+**Parâmetro e `%` mudam de forma no Postgres.** Duas diferenças que o DuckDB
+perdoa e o Postgres não, ambas tratadas em `api/db.py`:
+
+- Parâmetro usado só em `? is null` não tem tipo inferível — o Postgres responde
+  `could not determine data type of parameter $2`. Escreva
+  `cast(? as integer) is null`, que funciona nos dois.
+- O psycopg trata `%` como início de marcador, então `like '%' || ? || '%'`
+  explode. O `%` vira `%%` **antes** de `?` virar `%s` — na ordem inversa o `%s`
+  recém-criado viraria `%%s`.
+
+Nada disso aparece na compilação: só como 500 numa rota específica, no ambiente
+onde ninguém desenvolve. Rode o `verificar_bancos.py` depois de mexer em
+qualquer consulta.
+
+**No Dagster, efeito de nível de módulo não chega ao step.** O executor
+multiprocesso roda cada step num processo filho que **não reimporta** o módulo
+de definições — ele reconstrói o job a partir do que foi serializado. Um
+`sys.path.insert` no topo do arquivo executa ao carregar a interface e some na
+hora de executar, com `ModuleNotFoundError` apesar de o caminho estar certo. O
+que o step precisa tem que rodar **dentro da função do asset**.
+
 **Nomes sobrecarregados em português.** `cartao` já é o painel da interface no
 CSS — usar a mesma classe para cartão de arbitragem colapsou todos os painéis
 do app para 6px. Antes de criar uma classe, verifique se o nome já existe:
@@ -174,28 +238,34 @@ O mesmo cuidado vale para `time` (equipe vs. tempo) e `partida` (jogo vs. iníci
 
 ## Onde o projeto está
 
-**Extração: 100 tarefas pendentes, e uma execução zera a onda 3.**
+**A extração acabou.** Zero tarefas pendentes — a onda 3 fechou. Série A 2022,
+Série A 2023 e Série B 2024 estão 100% nos quatro datasets. Copa do Brasil e
+Paranaense fecharam evento e escalação; estatística e nota de jogador não
+existem na fonte para essas competições, e os pares estão em `SEM_DADO`.
 
-```bash
-env/bin/python extrair.py --orcamento 100
-```
+Só volta a haver fila quando o escopo crescer — plano pago, mais temporadas ou
+mais competições. O `extrair.py` já está preparado para isso: mexe-se em
+`PLANO` e `ESCOPO`, e o resto do arquivo não muda.
 
-Sobram Série B 2024 (52), Paranaense 2023/2024 (44, só evento e escalação — os
-outros dois endpoints estão em `SEM_DADO`) e Copa do Brasil 2024 (4). Série A
-2022 e 2023 já estão completas nos quatro datasets. Tudo o mais (calendários,
-ligas, times, classificações, artilheiros, técnicos, transferências) também.
+**Pronto e no ar:** 45 models, 32 endpoints, 9 páginas, e a aplicação inteira
+sobe em container. Home com recordes e campeões, competições, clubes,
+jogadores, jogo com campinho posicionado, elenco em duas leituras (totais e por
+90 minutos), e análises com 11 seções em 4 abas.
 
-**Pronto e no ar:** 45 models, 32 endpoints, 9 páginas. Home com recordes e
-campeões, competições, clubes, jogadores, jogo com campinho posicionado, elenco
-em duas leituras (totais e por 90 minutos), e a página de análises com 11 seções
-distribuídas em 4 abas — o jogo, ataque e defesa, disciplina, elenco e comissão.
+**Infraestrutura fechada:** Postgres serve a API, DuckDB transforma, e o Dagster
+orquestra a corrente com 58 assets e agendamento diário às 6h. As 39 rotas
+respondem idênticas nos dois bancos — conferido pelo `verificar_bancos.py`.
 
 **ML pausado**, e não por falta de esforço: ver a seção correspondente no
-`docs/contexto.md` antes de retomar.
+`docs/contexto.md` antes de retomar. Atenção a um detalhe que já esteve errado
+no roteiro — fechar a onda 3 **não** destravou features de estatística, porque
+ela sempre cobriu só os jogos do Coritiba. São 6,8% das linhas do
+`gold_features_partida`. O bloqueio continua sendo volume, e só o plano pago
+resolve.
 
-**Próximo bloco:** esgotar o que a base já tem em telas, depois Postgres e
-docker-compose. O Dagster saiu da frente da fila por incompatibilidade real —
-ver *Dagster e o Python 3.14* no `contexto.md` antes de tentar de novo.
+**Próximo bloco:** não há um óbvio. O roteiro do `contexto.md` está cumprido até
+o ML, que depende de assinatura. O que sobra é produto — comparar clubes lado a
+lado é a lacuna mais visível — ou expandir o escopo da extração.
 
 ## Skills
 

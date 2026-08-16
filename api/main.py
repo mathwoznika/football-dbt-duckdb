@@ -84,8 +84,8 @@ def listar_times(
         select team_id, team_nome, pais, fundacao, cidade,
                estadio, capacidade, logo_url
         from silver_time
-        where ? is null or lower(team_nome) like lower('%' || ? || '%')
-        order by team_nome
+        where cast(? as varchar) is null or lower(team_nome) like lower('%' || ? || '%')
+        order by team_nome, team_id
         limit ?
         """,
         [busca, busca, limite],
@@ -122,7 +122,7 @@ def temporadas_do_time(team_id: int):
                fase_mais_avancada
         from gold_time_temporada
         where time_id = ?
-        order by season desc, jogos desc
+        order by season desc, jogos desc, league_id
         """,
         [team_id],
     )
@@ -146,8 +146,8 @@ def campanha_do_time(
                pontos_acumulados, saldo_acumulado, pontos_5_anteriores
         from gold_campanha
         where time_id = ?
-          and (? is null or season = ?)
-          and (? is null or league_id = ?)
+          and (cast(? as integer) is null or season = ?)
+          and (cast(? as integer) is null or league_id = ?)
         order by data, jogo_n
         """,
         [team_id, season, season, league_id, league_id],
@@ -169,7 +169,7 @@ def confrontos_do_time(
                primeiro_confronto, ultimo_confronto
         from gold_confronto_direto
         where time_id = ? and jogos >= ?
-        order by jogos desc, aproveitamento_pct desc
+        order by jogos desc, aproveitamento_pct desc, adversario_id
         """,
         [team_id, min_jogos],
     )
@@ -194,7 +194,7 @@ def desempenho_por_tempo(team_id: int):
                viradas, reacoes, vantagens_empatadas, vantagens_perdidas
         from gold_desempenho_por_tempo
         where time_id = ?
-        order by season desc, jogos desc
+        order by season desc, jogos desc, league_id
         """,
         [team_id],
     )
@@ -212,9 +212,9 @@ def gols_por_periodo(
         select faixa, ordem_faixa, marcados, sofridos, jogos_com_evento
         from gold_gols_por_periodo
         where time_id = ?
-          and (? is null or season = ?)
-          and (? is null or league_id = ?)
-        order by ordem_faixa
+          and (cast(? as integer) is null or season = ?)
+          and (cast(? as integer) is null or league_id = ?)
+        order by season, league_id, ordem_faixa
         """,
         [team_id, season, season, league_id, league_id],
     )
@@ -259,7 +259,7 @@ def estatisticas_da_temporada(
                primeiro_jogo, ultimo_jogo
         from gold_time_estatistica_temporada
         where time_id = ? and jogos_com_estatistica >= ?
-        order by season desc, jogos_com_estatistica desc
+        order by season desc, jogos_com_estatistica desc, league_id
         """,
         [team_id, min_jogos],
     )
@@ -282,9 +282,9 @@ def cartoes_por_periodo(
                jogos_com_evento
         from gold_cartao_momento
         where time_id = ?
-          and (? is null or season = ?)
-          and (? is null or league_id = ?)
-        order by ordem_faixa
+          and (cast(? as integer) is null or season = ?)
+          and (cast(? as integer) is null or league_id = ?)
+        order by season, league_id, ordem_faixa
         """,
         [team_id, season, season, league_id, league_id],
     )
@@ -308,7 +308,7 @@ def disciplina(team_id: int):
                gols_sofridos_por_90_com_um_a_menos, gols_sofridos_por_90_normal
         from gold_disciplina
         where time_id = ?
-        order by season desc, jogos_com_evento desc
+        order by season desc, jogos_com_evento desc, league_id
         """,
         [team_id],
     )
@@ -384,9 +384,9 @@ def formacoes_do_time(
                primeiro_jogo, ultimo_jogo
         from gold_formacao_desempenho
         where time_id = ?
-          and (? is null or season = ?)
+          and (cast(? as integer) is null or season = ?)
           and jogos >= ?
-        order by season desc, jogos desc, aproveitamento_pct desc
+        order by season desc, jogos desc, aproveitamento_pct desc, league_id, formacao
         """,
         [team_id, season, season, min_jogos],
     )
@@ -428,7 +428,7 @@ def tecnicos_do_time(team_id: int):
                aproveitamento_pct, primeiro_jogo, ultimo_jogo
         from gold_tecnico_desempenho
         where time_id = ?
-        order by season desc, jogos desc
+        order by season desc, jogos desc, league_id, coach_id
         """,
         [team_id],
     )
@@ -459,7 +459,7 @@ def arbitragem(
                diferenca_amarelos, primeiro_jogo, ultimo_jogo
         from gold_arbitragem
         where time_id = ? and jogos >= ?
-        order by jogos desc, aproveitamento_pct desc
+        order by jogos desc, aproveitamento_pct desc, arbitro
         """,
         [team_id, min_jogos],
     )
@@ -524,7 +524,7 @@ def estatisticas_da_partida(fixture_id: int):
                passes_total, passes_certos, precisao_passe_pct
         from gold_partida_estatistica
         where fixture_id = ?
-        order by e_do_mandante desc
+        order by e_do_mandante desc, team_id
         """,
         [fixture_id],
     )
@@ -540,7 +540,7 @@ def eventos_da_partida(fixture_id: int):
                papel_relacionado
         from gold_partida_evento
         where fixture_id = ?
-        order by minuto, coalesce(acrescimo, 0)
+        order by minuto, coalesce(acrescimo, 0), tipo, coalesce(jogador, '')
         """,
         [fixture_id],
     )
@@ -576,8 +576,8 @@ def listar_jogadores(
                amarelos, vermelhos, defesas, gols_sofridos
         from gold_jogador
         where jogos_com_dado >= ?
-          and (? is null or lower(jogador_nome) like lower('%' || ? || '%'))
-        order by minutos desc nulls last
+          and (cast(? as varchar) is null or lower(jogador_nome) like lower('%' || ? || '%'))
+        order by minutos desc nulls last, player_id
         limit ?
         """,
         [min_jogos, busca, busca, limite],
@@ -624,11 +624,11 @@ def elenco(
                defesas_90, duelos_ganhos_pct, dribles_certos_pct, pontaria_pct
         from gold_jogador_temporada
         where team_id = ?
-          and (? is null or season = ?)
-          and (? is null or league_id = ?)
+          and (cast(? as integer) is null or season = ?)
+          and (cast(? as integer) is null or league_id = ?)
           and coalesce(minutos, 0) >= ?
-          and (? is null or grupo_posicao = ?)
-        order by minutos desc nulls last
+          and (cast(? as varchar) is null or grupo_posicao = ?)
+        order by minutos desc nulls last, player_id, season desc, league_id
         """,
         [
             team_id,
@@ -661,7 +661,7 @@ def temporadas_do_jogador(player_id: int):
                defesas_90, duelos_ganhos_pct, dribles_certos_pct, pontaria_pct
         from gold_jogador_temporada
         where player_id = ?
-        order by season desc, minutos desc nulls last
+        order by season desc, minutos desc nulls last, league_id
         """,
         [player_id],
     )
@@ -686,9 +686,9 @@ def jogos_do_jogador(
                duelos_ganhos, amarelos, vermelhos
         from gold_jogador_partida
         where player_id = ?
-          and (? is null or season = ?)
-          and (? is null or league_id = ?)
-        order by data
+          and (cast(? as integer) is null or season = ?)
+          and (cast(? as integer) is null or league_id = ?)
+        order by data, fixture_id
         """,
         [player_id, season, season, league_id, league_id],
     )
@@ -708,7 +708,7 @@ def artilheiros(league_id: int, season: int, limite: int = Query(default=10, ge=
                teve_mais_de_um_clube
         from gold_artilheiro
         where league_id = ? and season = ?
-        order by posicao_artilharia
+        order by posicao_artilharia, player_id
         limit ?
         """,
         [league_id, season, limite],
@@ -733,8 +733,8 @@ def transferencias(
                team_origem_id, team_origem, team_destino_id, team_destino
         from gold_transferencia
         where team_id_consultado = ?
-          and (? is null or year(data) >= ?)
-        order by data desc
+          and (cast(? as integer) is null or extract(year from data) >= ?)
+        order by data desc, player_id, team_destino_id, team_origem_id
         limit ?
         """,
         [team_id, desde, desde, limite],
@@ -783,7 +783,7 @@ def listar_competicoes():
                tem_chaveamento, tem_classificacao,
                jogos_com_evento, jogos_com_estatistica, cobertura_evento_pct
         from gold_competicao
-        order by season desc, jogos desc
+        order by season desc, jogos desc, league_id
         """
     )
 
@@ -828,7 +828,7 @@ def classificacao(league_id: int, season: int):
                aproveitamento_pct, ultimos_5
         from gold_classificacao
         where league_id = ? and season = ?
-        order by posicao
+        order by posicao, time_id
         """,
         [league_id, season],
     )
@@ -855,7 +855,7 @@ def chaveamento(league_id: int, season: int):
                vencedor_id, eliminado_id, data_inicio, data_fim
         from gold_confronto_eliminatorio
         where league_id = ? and season = ?
-        order by ordem_fase, time_a_nome
+        order by ordem_fase, time_a_nome, time_b_id
         """,
         [league_id, season],
     )

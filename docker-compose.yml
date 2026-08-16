@@ -1,0 +1,116 @@
+# Sobe o projeto inteiro fora da maquina de quem desenvolve.
+#
+# A ORDEM ENTRE OS SERVICOS e o que este arquivo realmente resolve. Nao adianta
+# a API subir antes de existir dado no Postgres, e nao adianta o pipeline
+# sincronizar antes de o banco aceitar conexao. Por isso o postgres tem
+# healthcheck, o pipeline espera ele ficar saudavel, e a API espera o pipeline
+# TERMINAR — `service_completed_successfully`, e nao apenas iniciar.
+#
+#   docker compose up --build        sobe tudo, na ordem
+#   docker compose run --rm pipeline reprocessa depois de uma extracao nova
+#
+# O DuckDB continua sendo quem transforma; ele so nao serve ninguem. Ver o
+# cabecalho de api/db.py para o raciocinio da separacao.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-futebol}
+      POSTGRES_USER: ${POSTGRES_USER:-futebol}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-futebol}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # exposto para dar para inspecionar o banco de fora com psql ou DBeaver
+      - "5432:5432"
+    healthcheck:
+      # `pg_isready` responde antes de o banco aceitar conexao de verdade em
+      # alguns casos; o -d amarra a checagem ao banco que vamos usar.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-futebol} -d ${POSTGRES_DB:-futebol}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: docker/pipeline.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-futebol}
+      POSTGRES_USER: ${POSTGRES_USER:-futebol}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-futebol}
+    volumes:
+      # O raw custou dias de cota e o warehouse e reconstruivel a partir dele.
+      # Nenhum dos dois entra na imagem: montar mantem o dado na maquina e
+      # deixa a imagem leve e descartavel.
+      - ./data:/app/data
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully
+    environment:
+      BANCO: postgres
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-futebol}
+      POSTGRES_USER: ${POSTGRES_USER:-futebol}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-futebol}
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        # Mesma origem via nginx: sem isso o navegador tentaria 127.0.0.1:8000
+        # a partir do container e o CORS voltaria a ser problema.
+        VITE_API_BASE: /api
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+  # Interface de orquestracao. Fica atras de um profile porque a stack
+  # principal nao depende dela para servir: `docker compose up` sobe o site,
+  # `--profile orquestracao` acrescenta o Dagster.
+  #
+  #   docker compose --profile orquestracao up -d dagster
+  #   http://localhost:3000
+  dagster:
+    profiles: [orquestracao]
+    build:
+      context: .
+      dockerfile: docker/pipeline.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-futebol}
+      POSTGRES_USER: ${POSTGRES_USER:-futebol}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-futebol}
+      # A chave da API-Football, para o asset de extracao funcionar de dentro
+      # do container. Sem ela o Dagster sobe e so a extracao falha.
+      URL: ${URL:-}
+      API-KEY: ${API-KEY:-}
+    volumes:
+      - ./data:/app/data
+      # O estado do Dagster (historico de execucao, agendamentos) sobrevive ao
+      # container. Sem isto, cada `up` esqueceria tudo que ja rodou.
+      - dagster_home:/app/.dagster
+    ports:
+      - "3000:3000"
+    command: dagster dev -m orquestracao.definitions -h 0.0.0.0 -p 3000
+
+volumes:
+  postgres_data:
+  dagster_home:

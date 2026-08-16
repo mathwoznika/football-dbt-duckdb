@@ -10,7 +10,18 @@
  * FastAPI, e ai o front quebra na compilacao se a API mudar um campo.
  */
 
-const BASE = "http://127.0.0.1:8000";
+/**
+ * Endereco da API.
+ *
+ * Em desenvolvimento o front roda em :5173 e a API em :8000, origens
+ * diferentes — dai a URL absoluta e o CORS liberado no FastAPI.
+ *
+ * No docker-compose o nginx serve os dois no mesmo host e repassa /api/ para o
+ * container da API. Ali VITE_API_BASE vale "/api", tudo vira mesma origem e o
+ * CORS deixa de existir como problema. A variavel e lida na compilacao, entao
+ * cada imagem carrega o endereco certo embutido.
+ */
+const BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 
 export type Time = {
   team_id: number;
